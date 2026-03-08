@@ -1,0 +1,327 @@
+[
+  {
+    "id": "potion_red",
+    "name": "Health Potion",
+    "type": "consumable",
+    "icon": "potion_red",
+    "value": 25,
+    "stack_max": 20,
+    "description": "Restores 30 HP instantly",
+    "buff_type": "heal",
+    "buff_value": 30,
+    "buff_duration": 0
+  },
+  {
+    "id": "potion_blue",
+    "name": "Power Potion",
+    "type": "consumable",
+    "icon": "potion_blue",
+    "value": 35,
+    "stack_max": 20,
+    "description": "+10 damage for 15 seconds",
+    "buff_type": "damage_up",
+    "buff_value": 10,
+    "buff_duration": 15
+  },
+  {
+    "id": "potion_green",
+    "name": "Speed Potion",
+    "type": "consumable",
+    "icon": "potion_green",
+    "value": 30,
+    "stack_max": 20,
+    "description": "+50% speed for 10 seconds",
+    "buff_type": "speed_up",
+    "buff_value": 50,
+    "buff_duration": 10
+  },
+  {
+    "id": "mushroom",
+    "name": "Mushroom",
+    "type": "consumable",
+    "icon": "mushroom",
+    "value": 5,
+    "stack_max": 20,
+    "description": "Restores 10 HP",
+    "buff_type": "heal",
+    "buff_value": 10,
+    "buff_duration": 0
+  },
+  {
+    "id": "berries",
+    "name": "Berries",
+    "type": "consumable",
+    "icon": "berries",
+    "value": 8,
+    "stack_max": 20,
+    "description": "Restores 15 HP",
+    "buff_type": "heal",
+    "buff_value": 15,
+    "buff_duration": 0
+  },
+  {
+    "id": "defense_mushroom",
+    "name": "Iron Mushroom",
+    "type": "consumable",
+    "icon": "mushroom2",
+    "value": 20,
+    "stack_max": 20,
+    "description": "+5 defense for 12 seconds",
+    "buff_type": "defense_up",
+    "buff_value": 5,
+    "buff_duration": 12
+  },
+  {
+    "id": "cat_fang",
+    "name": "Cat Fang",
+    "type": "sellable",
+    "icon": "sellable",
+    "value": 8,
+    "stack_max": 20,
+    "description": "A sharp fang. Sell for gold."
+  },
+  {
+    "id": "dog_pelt",
+    "name": "Dog Pelt",
+    "type": "sellable",
+    "icon": "sellable",
+    "value": 12,
+    "stack_max": 20,
+    "description": "A rough pelt. Sell for gold."
+  },
+  {
+    "id": "bandit_coin",
+    "name": "Bandit Coin",
+    "type": "sellable",
+    "icon": "sellable",
+    "value": 18,
+    "stack_max": 20,
+    "description": "Stolen coins. Sell for gold."
+  },
+  {
+    "id": "soldier_medal",
+    "name": "Soldier Medal",
+    "type": "sellable",
+    "icon": "sellable",
+    "value": 30,
+    "stack_max": 20,
+    "description": "A military medal. Sell for gold."
+  },
+  {
+    "id": "guard_badge",
+    "name": "Guard Badge",
+    "type": "sellable",
+    "icon": "sellable",
+    "value": 45,
+    "stack_max": 20,
+    "description": "An official badge. Sell for gold."
+  },
+  {
+    "id": "commander_insignia",
+    "name": "Commander Insignia",
+    "type": "sellable",
+    "icon": "sellable",
+    "value": 70,
+    "stack_max": 20,
+    "description": "A rare military insignia. Very valuable."
+  },
+  {
+    "id": "crystal",
+    "name": "Crystal",
+    "type": "sellable",
+    "icon": "sellable",
+    "value": 75,
+    "stack_max": 20,
+    "description": "A glowing crystal. Sell for gold."
+  },
+  {
+    "id": "iron_sword_item",
+    "name": "Iron Sword",
+    "type": "weapon",
+    "weapon_id": "iron_sword",
+    "icon": "weapon_sword",
+    "value": 80,
+    "stack_max": 1,
+    "description": "A sturdy iron blade."
+  },
+  {
+    "id": "steel_sword_item",
+    "name": "Steel Sword",
+    "type": "weapon",
+    "weapon_id": "steel_sword",
+    "icon": "weapon_sword",
+    "value": 200,
+    "stack_max": 1,
+    "description": "A fine steel blade."
+  },
+  {
+    "id": "magic_staff_item",
+    "name": "Magic Staff",
+    "type": "weapon",
+    "weapon_id": "magic_staff",
+    "icon": "weapon_staff",
+    "value": 350,
+    "stack_max": 1,
+    "description": "Crackling with arcane energy."
+  },
+  {
+    "id": "great_axe_item",
+    "name": "Great Axe",
+    "type": "weapon",
+    "weapon_id": "great_axe",
+    "icon": "weapon_axe",
+    "value": 500,
+    "stack_max": 1,
+    "description": "A heavy, devastating axe."
+  },
+  {
+    "id": "legendary_blade_item",
+    "name": "Legendary Blade",
+    "type": "weapon",
+    "weapon_id": "legendary_blade",
+    "icon": "weapon_legendary",
+    "value": 1000,
+    "stack_max": 1,
+    "description": "A weapon of immense power."
+  },
+  {
+    "id": "long_sword_item",
+    "name": "Long Sword",
+    "type": "weapon",
+    "weapon_id": "long_sword",
+    "icon": "weapon_sword",
+    "value": 120,
+    "stack_max": 1,
+    "description": "An extended blade with exceptional reach."
+  },
+  {
+    "id": "war_axe_item",
+    "name": "War Axe",
+    "type": "weapon",
+    "weapon_id": "war_axe",
+    "icon": "weapon_axe",
+    "value": 600,
+    "stack_max": 1,
+    "description": "A massive axe that strikes from afar."
+  },
+  {
+    "id": "mythic_blade_item",
+    "name": "Mythic Blade",
+    "type": "weapon",
+    "weapon_id": "mythic_blade",
+    "icon": "weapon_legendary",
+    "value": 1200,
+    "stack_max": 1,
+    "description": "A legendary weapon with devastating reach."
+  },
+  {
+    "id": "battle_staff_item",
+    "name": "Battle Staff",
+    "type": "weapon",
+    "weapon_id": "battle_staff",
+    "icon": "weapon_staff",
+    "value": 450,
+    "stack_max": 1,
+    "description": "A staff that channels power at great distance."
+  },
+  {
+    "id": "hunters_bow_item",
+    "name": "Hunter's Bow",
+    "type": "weapon",
+    "weapon_id": "hunters_bow",
+    "icon": "weapon_bow",
+    "value": 90,
+    "stack_max": 1,
+    "description": "A sturdy bow that fires arrows at range."
+  },
+  {
+    "id": "crossbow_item",
+    "name": "Crossbow",
+    "type": "weapon",
+    "weapon_id": "crossbow",
+    "icon": "weapon_bow",
+    "value": 300,
+    "stack_max": 1,
+    "description": "A powerful crossbow with long range."
+  },
+  {
+    "id": "flintlock_item",
+    "name": "Flintlock Pistol",
+    "type": "weapon",
+    "weapon_id": "flintlock",
+    "icon": "weapon_gun",
+    "value": 550,
+    "stack_max": 1,
+    "description": "A loud pistol that fires deadly bullets."
+  },
+  {
+    "id": "mage_bolt_item",
+    "name": "Mage Bolt Staff",
+    "type": "weapon",
+    "weapon_id": "mage_bolt",
+    "icon": "weapon_staff",
+    "value": 50,
+    "stack_max": 1,
+    "description": "A staff that fires bolts of arcane energy."
+  },
+  {
+    "id": "leather_armor_item",
+    "name": "Leather Armor",
+    "type": "armor",
+    "armor_id": "leather",
+    "icon": "armor_leather",
+    "value": 40,
+    "stack_max": 1,
+    "description": "Light protection. DEF +2. Any class."
+  },
+  {
+    "id": "padded_armor_item",
+    "name": "Padded Armor",
+    "type": "armor",
+    "armor_id": "padded",
+    "icon": "armor_padded",
+    "value": 100,
+    "stack_max": 1,
+    "description": "Decent defense. DEF +4. Any class."
+  },
+  {
+    "id": "chain_shirt_item",
+    "name": "Chain Shirt",
+    "type": "armor",
+    "armor_id": "chain_shirt",
+    "icon": "armor_chain",
+    "value": 200,
+    "stack_max": 1,
+    "description": "Metal rings. DEF +6. Warrior/Paladin only."
+  },
+  {
+    "id": "chain_mail_item",
+    "name": "Chain Mail",
+    "type": "armor",
+    "armor_id": "chain_mail",
+    "icon": "armor_chain",
+    "value": 350,
+    "stack_max": 1,
+    "description": "Full chain. DEF +8. Warrior/Paladin only."
+  },
+  {
+    "id": "half_plate_item",
+    "name": "Half Plate",
+    "type": "armor",
+    "armor_id": "half_plate",
+    "icon": "armor_plate",
+    "value": 550,
+    "stack_max": 1,
+    "description": "Thick plates. DEF +10. Warrior/Paladin only."
+  },
+  {
+    "id": "full_plate_item",
+    "name": "Full Plate",
+    "type": "armor",
+    "armor_id": "full_plate",
+    "icon": "armor_plate",
+    "value": 900,
+    "stack_max": 1,
+    "description": "Maximum defense. DEF +12. Warrior/Paladin only."
+  }
+]

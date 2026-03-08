@@ -1,0 +1,84 @@
+{
+  "hero_id": "warrior",
+  "hero_name": "Warrior",
+  "selected_hero_index": 0,
+  "level": 6,
+  "xp": 988,
+  "hp": 182,
+  "max_hp": 200,
+  "mana": 0,
+  "grit": 100,
+  "gold": 2097,
+  "base_damage": 20,
+  "equipped_weapon_id": "iron_sword",
+  "equipped_armor_id": "chain_shirt",
+  "buffs": {},
+  "inventory": [
+    {
+      "item_id": "potion_red",
+      "quantity": 17
+    },
+    {
+      "item_id": "cat_fang",
+      "quantity": 1
+    },
+    {
+      "item_id": "bandit_coin",
+      "quantity": 7
+    },
+    {
+      "item_id": "padded_armor_item",
+      "quantity": 1
+    },
+    {
+      "item_id": "potion_green",
+      "quantity": 2
+    },
+    {
+      "item_id": "dog_pelt",
+      "quantity": 1
+    },
+    {
+      "item_id": "berries",
+      "quantity": 7
+    },
+    {
+      "item_id": "potion_blue",
+      "quantity": 1
+    },
+    {
+      "item_id": "battle_staff_item",
+      "quantity": 1
+    },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "stage_num": 2,
+  "stage_type": "town",
+  "combat_music_index": 10,
+  "town_music_index": 2,
+  "selected_spell_idx": 2,
+  "shield_hp": 0,
+  "action_surge_timer": 0.0,
+  "whirlwind_timer": 0.0,
+  "blazing_sword_timer": 0.0,
+  "double_fire_timer": 0.0,
+  "last_town_num": 2,
+  "name": "Autosave",
+  "timestamp": "2026-03-07 19:25:57",
+  "version": 1
+}

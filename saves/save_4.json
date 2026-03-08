@@ -1,0 +1,71 @@
+{
+  "hero_id": "mage",
+  "hero_name": "Mage",
+  "selected_hero_index": 1,
+  "level": 12,
+  "xp": 7796,
+  "hp": 195,
+  "max_hp": 224,
+  "mana": 160,
+  "grit": 0,
+  "gold": 18688,
+  "base_damage": 32,
+  "equipped_weapon_id": "mage_bolt",
+  "equipped_armor_id": "padded",
+  "buffs": {},
+  "inventory": [
+    {
+      "item_id": "potion_red",
+      "quantity": 20
+    },
+    {
+      "item_id": "potion_red",
+      "quantity": 20
+    },
+    {
+      "item_id": "potion_red",
+      "quantity": 20
+    },
+    {
+      "item_id": "mushroom",
+      "quantity": 3
+    },
+    {
+      "item_id": "potion_green",
+      "quantity": 4
+    },
+    {
+      "item_id": "potion_red",
+      "quantity": 20
+    },
+    {
+      "item_id": "potion_red",
+      "quantity": 15
+    },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "stage_num": 7,
+  "stage_type": "town",
+  "combat_music_index": 28,
+  "town_music_index": 14,
+  "name": "Save 8",
+  "timestamp": "2026-03-06 22:08:19",
+  "version": 1
+}

@@ -1,0 +1,108 @@
+{
+  "town_1": {
+    "name": "Village Shop",
+    "items": [
+      {"item_id": "potion_red", "stock": 10},
+      {"item_id": "mushroom", "stock": 20},
+      {"item_id": "berries", "stock": 15},
+      {"item_id": "leather_armor_item", "stock": 1}
+    ]
+  },
+  "town_2": {
+    "name": "Forest Outpost",
+    "items": [
+      {"item_id": "potion_red", "stock": 15},
+      {"item_id": "potion_green", "stock": 5},
+      {"item_id": "mushroom", "stock": 20},
+      {"item_id": "iron_sword_item", "stock": 1},
+      {"item_id": "hunters_bow_item", "stock": 1},
+      {"item_id": "leather_armor_item", "stock": 2}
+    ]
+  },
+  "town_3": {
+    "name": "Mountain Trading Post",
+    "items": [
+      {"item_id": "potion_red", "stock": 20},
+      {"item_id": "potion_blue", "stock": 8},
+      {"item_id": "potion_green", "stock": 8},
+      {"item_id": "iron_sword_item", "stock": 2},
+      {"item_id": "defense_mushroom", "stock": 10},
+      {"item_id": "padded_armor_item", "stock": 1},
+      {"item_id": "chain_shirt_item", "stock": 1}
+    ]
+  },
+  "town_4": {
+    "name": "Crossroads Market",
+    "items": [
+      {"item_id": "potion_red", "stock": 25},
+      {"item_id": "potion_blue", "stock": 10},
+      {"item_id": "potion_green", "stock": 10},
+      {"item_id": "steel_sword_item", "stock": 1},
+      {"item_id": "crossbow_item", "stock": 1},
+      {"item_id": "defense_mushroom", "stock": 15},
+      {"item_id": "padded_armor_item", "stock": 1},
+      {"item_id": "chain_shirt_item", "stock": 1}
+    ]
+  },
+  "town_5": {
+    "name": "Frozen Haven",
+    "items": [
+      {"item_id": "potion_red", "stock": 30},
+      {"item_id": "potion_blue", "stock": 15},
+      {"item_id": "potion_green", "stock": 15},
+      {"item_id": "steel_sword_item", "stock": 2},
+      {"item_id": "magic_staff_item", "stock": 1},
+      {"item_id": "chain_shirt_item", "stock": 1},
+      {"item_id": "chain_mail_item", "stock": 1}
+    ]
+  },
+  "town_6": {
+    "name": "Snowpeak Emporium",
+    "items": [
+      {"item_id": "potion_red", "stock": 30},
+      {"item_id": "potion_blue", "stock": 20},
+      {"item_id": "potion_green", "stock": 20},
+      {"item_id": "magic_staff_item", "stock": 2},
+      {"item_id": "great_axe_item", "stock": 1},
+      {"item_id": "flintlock_item", "stock": 1},
+      {"item_id": "chain_shirt_item", "stock": 1},
+      {"item_id": "chain_mail_item", "stock": 1}
+    ]
+  },
+  "town_7": {
+    "name": "Warrior's Rest",
+    "items": [
+      {"item_id": "potion_red", "stock": 40},
+      {"item_id": "potion_blue", "stock": 25},
+      {"item_id": "potion_green", "stock": 25},
+      {"item_id": "defense_mushroom", "stock": 20},
+      {"item_id": "great_axe_item", "stock": 2},
+      {"item_id": "chain_mail_item", "stock": 1},
+      {"item_id": "half_plate_item", "stock": 1}
+    ]
+  },
+  "town_8": {
+    "name": "Last Outpost",
+    "items": [
+      {"item_id": "potion_red", "stock": 50},
+      {"item_id": "potion_blue", "stock": 30},
+      {"item_id": "potion_green", "stock": 30},
+      {"item_id": "defense_mushroom", "stock": 30},
+      {"item_id": "great_axe_item", "stock": 3},
+      {"item_id": "legendary_blade_item", "stock": 1},
+      {"item_id": "chain_mail_item", "stock": 1},
+      {"item_id": "half_plate_item", "stock": 1}
+    ]
+  },
+  "town_9": {
+    "name": "Final Stand",
+    "items": [
+      {"item_id": "potion_red", "stock": 99},
+      {"item_id": "potion_blue", "stock": 50},
+      {"item_id": "potion_green", "stock": 50},
+      {"item_id": "defense_mushroom", "stock": 50},
+      {"item_id": "legendary_blade_item", "stock": 2},
+      {"item_id": "full_plate_item", "stock": 1}
+    ]
+  }
+}
