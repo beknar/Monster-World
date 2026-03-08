@@ -18,6 +18,7 @@ from src.settings import (
     CONTROLLER_AXIS_LX, CONTROLLER_AXIS_LY,
     MONSTER_STATS, BOSS_HP_MULT, BOSS_DAMAGE_MULT,
     PLAYER_SPEED, BOSS_CHASE_SPEED,
+    CHAIN_AGGRO_RANGE,
     ARMOR_DEFS, SPELL_DEFS, GRIT_ABILITIES, XP_THRESHOLDS,
     STAGE_BOSSES, BOSS_STAGE_SCALING,
 )
@@ -513,6 +514,55 @@ class Game:
         pygame.draw.rect(img, (200, 180, 100), (4, 4, icon_size - 8, icon_size - 8))
         pygame.draw.rect(img, (160, 140, 60), (4, 4, icon_size - 8, icon_size - 8), 2)
         self.item_icons["sellable"] = img
+
+        cx = icon_size // 2  # icon center x/y
+
+        # --- Bandit Coin: crude stamped bronze coin ---
+        img = pygame.Surface((icon_size, icon_size), pygame.SRCALPHA)
+        pygame.draw.circle(img, (140, 100, 30), (cx, cx), 15)
+        pygame.draw.circle(img, (90, 60, 15), (cx, cx), 15, 2)
+        for _a in range(0, 360, 30):
+            _ax = cx + int(13 * math.cos(math.radians(_a)))
+            _ay = cx + int(13 * math.sin(math.radians(_a)))
+            pygame.draw.circle(img, (100, 70, 20), (_ax, _ay), 2)
+        pygame.draw.line(img, (80, 55, 15), (cx - 7, cx - 7), (cx + 7, cx + 7), 2)
+        pygame.draw.line(img, (80, 55, 15), (cx + 7, cx - 7), (cx - 7, cx + 7), 2)
+        pygame.draw.circle(img, (180, 140, 60), (cx - 5, cx - 5), 3)
+        self.item_icons["bandit_coin"] = img
+
+        # --- Dog Pelt: scraggly brown animal hide ---
+        img = pygame.Surface((icon_size, icon_size), pygame.SRCALPHA)
+        hide_pts = [(cx, 4), (cx + 8, 8), (cx + 14, 16), (cx + 12, 26),
+                    (cx + 6, 34), (cx, 36), (cx - 6, 34), (cx - 12, 26),
+                    (cx - 14, 16), (cx - 8, 8)]
+        pygame.draw.polygon(img, (110, 70, 35), hide_pts)
+        inner_pts = [(cx, 8), (cx + 6, 12), (cx + 10, 19), (cx + 8, 27),
+                     (cx + 2, 32), (cx, 33), (cx - 2, 32), (cx - 8, 27),
+                     (cx - 10, 19), (cx - 6, 12)]
+        pygame.draw.polygon(img, (155, 110, 60), inner_pts)
+        for _fx, _fy, _ex, _ey in [
+                (cx - 11, 12, cx - 14, 9), (cx - 14, 20, cx - 17, 19),
+                (cx - 12, 28, cx - 15, 30), (cx + 11, 12, cx + 14, 9),
+                (cx + 14, 21, cx + 17, 20), (cx + 12, 28, cx + 15, 30),
+                (cx - 4, 5, cx - 5, 2), (cx + 4, 5, cx + 5, 2)]:
+            pygame.draw.line(img, (75, 45, 20), (_fx, _fy), (_ex, _ey), 1)
+        self.item_icons["dog_pelt"] = img
+
+        # --- Soldier Medal: ribbon + circular gold medal with star ---
+        img = pygame.Surface((icon_size, icon_size), pygame.SRCALPHA)
+        pygame.draw.rect(img, (180, 30, 30), (cx - 4, 2, 8, 12))
+        pygame.draw.rect(img, (40, 60, 180), (cx - 4, 2, 4, 12))
+        pygame.draw.circle(img, (220, 175, 40), (cx, cx + 4), 12)
+        pygame.draw.circle(img, (180, 140, 20), (cx, cx + 4), 12, 2)
+        _star_pts = []
+        for _si in range(10):
+            _sr = 7 if _si % 2 == 0 else 3
+            _sa = math.radians(_si * 36 - 90)
+            _star_pts.append((cx + int(_sr * math.cos(_sa)),
+                               cx + 4 + int(_sr * math.sin(_sa))))
+        pygame.draw.polygon(img, (255, 235, 100), _star_pts)
+        pygame.draw.circle(img, (240, 210, 120), (cx - 4, cx), 3)
+        self.item_icons["soldier_medal"] = img
 
         # --- Armor icons (shield shapes) ---
         # Leather armor: brown shield
@@ -1438,8 +1488,10 @@ class Game:
 
     def _do_attack(self):
         """Process player attack against monsters and chests."""
-        if self.player.equipped_weapon.is_ranged:
-            # Ranged attack: spawn projectile
+        wpn = self.player.equipped_weapon
+
+        if wpn.is_ranged and not wpn.is_dual:
+            # Pure ranged attack: spawn projectile, no melee hitbox
             attack_rect = self.player.attack()  # Sets cooldown, returns None
             if self.player.is_attacking:
                 proj_info = self.player.get_projectile_info()
@@ -1451,7 +1503,7 @@ class Game:
                         proj_info["style"]
                     )
                     self.projectiles.append(proj)
-                    self.audio.play_sfx(self.player.equipped_weapon.sound_swing)
+                    self.audio.play_sfx(wpn.sound_swing)
                     # Double Fire: spawn a second homing projectile alongside
                     if self.player.double_fire_timer > 0:
                         homing_proj = Projectile(
@@ -1462,7 +1514,7 @@ class Game:
                         )
                         self.projectiles.append(homing_proj)
         else:
-            # Melee attack
+            # Melee attack (or dual melee+ranged for battle staff)
             hits, chest_hits = self.combat.player_attack(
                 self.player, list(self.stage.monsters), self.stage.chests)
             if hits:
@@ -1481,6 +1533,18 @@ class Game:
             # Whirlwind: additionally hit all monsters in 50px radius on each swing
             if self.player.whirlwind_timer > 0 and self.player.is_attacking:
                 self._do_whirlwind_attack()
+            # Dual attack: also fire a projectile simultaneously with the melee swing
+            if wpn.is_dual and self.player.is_attacking:
+                proj_info = self.player.get_projectile_info()
+                if proj_info:
+                    proj = Projectile(
+                        proj_info["spawn_x"], proj_info["spawn_y"],
+                        proj_info["direction"], proj_info["speed"],
+                        proj_info["damage"], proj_info["max_range"],
+                        proj_info["style"]
+                    )
+                    self.projectiles.append(proj)
+                    self.audio.play_sfx(wpn.sound_swing)
 
     def _process_chest_hits(self, chest_hits: list):
         """Handle destroyed treasure chests: spawn loot, remove from stage."""
@@ -1907,18 +1971,18 @@ class Game:
 
         elif ab_type == "polymorph":
             from src.settings import POLYMORPH_PROGRESSION
-            # Find nearest living non-boss monster
+            # Find nearest living monster (bosses now targetable)
             target = None
             best = float('inf')
             for m in self.stage.monsters:
-                if not m.is_alive or m.is_boss:
+                if not m.is_alive:
                     continue
                 d = (m.world_x - px)**2 + (m.world_y - py)**2
                 if d < best:
                     best = d
                     target = m
             if target:
-                # Downgrade type
+                # Downgrade type one step in the progression
                 cur = getattr(target, 'monster_type', None)
                 if cur in POLYMORPH_PROGRESSION:
                     idx = POLYMORPH_PROGRESSION.index(cur)
@@ -1929,7 +1993,8 @@ class Game:
                 self.spell_effects.append(
                     SpellEffect("aoe_circle", target.world_x, target.world_y,
                                 direction, 40))
-                self.hud.show_message(f"Polymorphed to {new_type}!")
+                boss_prefix = "Boss " if target.is_boss else ""
+                self.hud.show_message(f"{boss_prefix}Polymorphed to {new_type}!")
             else:
                 self.hud.show_message("No targets!")
                 self.player.mana = min(self.player.max_mana,
@@ -2328,7 +2393,8 @@ class Game:
             self.hud.update(dt)
         elif self.state == self.STATE_SHOP:
             if self.active_shop:
-                self.active_shop.update(dt, pygame.mouse.get_pos())
+                self.active_shop.update(dt, pygame.mouse.get_pos(),
+                                        self.player, self.audio)
             self.hud.update(dt)
 
     def _update_playing(self, dt: float):
@@ -2356,6 +2422,21 @@ class Game:
         player_pos = (self.player.world_x, self.player.world_y)
         for monster in self.stage.monsters:
             monster.update(dt, player_pos, self.stage.obstacle_rects, all_entities)
+
+        # Chain aggro: newly enraged monsters alert nearby idle monsters
+        _chain_r2 = CHAIN_AGGRO_RANGE * CHAIN_AGGRO_RANGE
+        for m in self.stage.monsters:
+            if m._just_enraged:
+                m._just_enraged = False
+                for other in self.stage.monsters:
+                    if (other is m or not other.is_alive
+                            or other.is_boss or other.is_enraged):
+                        continue
+                    ddx = other.world_x - m.world_x
+                    ddy = other.world_y - m.world_y
+                    if ddx * ddx + ddy * ddy < _chain_r2:
+                        other.is_enraged = True
+                        other._just_enraged = True
 
         # NPCs
         self.hud.near_merchant = False
@@ -4117,17 +4198,20 @@ class Game:
         px = int(player.world_x) - cam_x
         py = int(player.world_y) - cam_y
 
-        # --- Shield bubble ---
+        # --- Shield bubble — centered on sprite, large enough to cover full character ---
         if player.shield_hp > 0:
             pulse = 0.5 + 0.5 * _math.sin(now * 0.005)
-            radius = int(26 + pulse * 4)
+            # Sprite height ≈ 1.5 × TILE_SIZE; center is halfway up from feet
+            from src.settings import TILE_SIZE as _TS
+            radius = int(_TS * 1.05 + pulse * 4)
+            py_center = py - int(_TS * 0.75)  # Shift up to sprite center
             shield_surf = pygame.Surface((radius * 2 + 4, radius * 2 + 4), pygame.SRCALPHA)
             center = (radius + 2, radius + 2)
             alpha_outer = int(60 + pulse * 40)
             alpha_ring = int(160 + pulse * 80)
             pygame.draw.circle(shield_surf, (80, 140, 255, alpha_outer), center, radius)
             pygame.draw.circle(shield_surf, (180, 210, 255, alpha_ring), center, radius, 3)
-            self.screen.blit(shield_surf, (px - radius - 2, py - radius - 2))
+            self.screen.blit(shield_surf, (px - radius - 2, py_center - radius - 2))
 
         # --- Whirlwind ring (rotating dots around player) ---
         if player.whirlwind_timer > 0:

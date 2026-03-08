@@ -118,14 +118,17 @@
     "id": "battle_staff",
     "name": "Battle Staff",
     "damage": 40,
-    "range": 150,
+    "range": 300,
     "speed": 0.55,
     "icon": "10",
     "style": "staff",
     "blade_color": [100, 200, 255],
     "sound_swing": "sword_swing",
     "sound_hit": "hit3",
-    "classes": ["mage"]
+    "classes": ["mage"],
+    "projectile_speed": 350,
+    "projectile_style": "magic",
+    "dual_attack": true
   },
   {
     "id": "hunters_bow",

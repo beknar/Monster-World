@@ -34,8 +34,8 @@ class Projectile(pygame.sprite.Sprite):
         self.image = self._create_sprite()
         self.rect = self.image.get_rect(center=(int(x), int(y)))
 
-        # Small collision rect for precise hit detection
-        self.collision_rect = pygame.Rect(0, 0, 8, 8)
+        # Collision rect — enlarged for more forgiving hit detection
+        self.collision_rect = pygame.Rect(0, 0, 16, 16)
         self.collision_rect.center = (int(x), int(y))
 
     def _create_sprite(self) -> pygame.Surface:

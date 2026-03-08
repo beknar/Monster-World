@@ -7,7 +7,8 @@ from src.settings import (SCALE_FACTOR, TILE_SIZE, ANIM_SPEED,
                           MONSTER_STATS, MONSTER_SPRITES, CHARS_FRAMES_PATH,
                           BOSS_HP_MULT, BOSS_DAMAGE_MULT, BOSS_XP_MULT,
                           BOSS_CHASE_DURATION, BOSS_CHASE_SPEED,
-                          MONSTER_ATTACK_DURATION, POLYMORPH_PROGRESSION)
+                          MONSTER_ATTACK_DURATION, POLYMORPH_PROGRESSION,
+                          PROXIMITY_AGGRO_RANGE, CHAIN_AGGRO_RANGE)
 from src.animation import AnimationSet, Animation, load_character_frames
 from src.collision import resolve_movement, get_obstacle_rects_near
 
@@ -50,6 +51,7 @@ class Monster(pygame.sprite.Sprite):
 
         # Enrage: any non-boss monster that survives a hit chases the player permanently
         self.is_enraged = False
+        self._just_enraged = False   # True for one frame when is_enraged first becomes True
 
         # Attack cooldown and proximity attack
         self.attack_interval = stats.get("attack_interval", 1.5)
@@ -88,14 +90,20 @@ class Monster(pygame.sprite.Sprite):
         self.is_darkened = False
         self.darkened_timer = 0.0
 
+        # Pathfinding — used when monster gets stuck behind obstacles
+        self.stuck_timer = 0.0          # seconds the monster has been unable to move
+        self.stuck_path: list = []      # list of (world_x, world_y) waypoints
+        self.stuck_path_idx: int = 0
+        self._path_recompute_timer = 0.0  # cooldown before recomputing A* path
+
         # Animation — load from individual frame files
         self.anim_set = self._load_animations()
         self.image = self.anim_set.update(0)
         self.rect = self.image.get_rect(center=(int(self.world_x), int(self.world_y)))
 
-        # Collision rect
-        cw = self.rect.width * 0.7
-        ch = self.rect.height * 0.5
+        # Collision rect (enlarged for more forgiving hit detection)
+        cw = self.rect.width * 0.85
+        ch = self.rect.height * 0.70
         self.collision_rect = pygame.Rect(0, 0, int(cw), int(ch))
         self._update_collision_rect()
 
@@ -201,6 +209,15 @@ class Monster(pygame.sprite.Sprite):
 
         self.is_moving = False
 
+        # --- Proximity aggro: player walking too close triggers idle monster ---
+        if (player_pos and not self.is_boss and not self.is_enraged
+                and not self.is_darkened):
+            pdx = player_pos[0] - self.world_x
+            pdy = player_pos[1] - self.world_y
+            if pdx * pdx + pdy * pdy < PROXIMITY_AGGRO_RANGE * PROXIMITY_AGGRO_RANGE:
+                self.is_enraged = True
+                self._just_enraged = True
+
         if self.is_enraged and not self.is_boss and player_pos:
             self._do_enraged_chase(dt, player_pos, obstacles or [], entities or [])
         elif self.behavior == "patrol" and self.patrol_points:
@@ -269,14 +286,52 @@ class Monster(pygame.sprite.Sprite):
             self._try_move(nx, ny, obstacles, entities)
 
     def _do_enraged_chase(self, dt, player_pos, obstacles, entities):
-        """Chase the player at full speed after taking non-fatal damage."""
+        """Chase the player at full speed, routing around obstacles when stuck."""
         dx = player_pos[0] - self.world_x
         dy = player_pos[1] - self.world_y
         dist = math.sqrt(dx * dx + dy * dy)
-        if dist > TILE_SIZE * 0.5:
+
+        # Clear A* path once close enough for direct chase
+        if dist < TILE_SIZE * 2:
+            self.stuck_path = []
+            self.stuck_timer = 0.0
+
+        self._path_recompute_timer = max(0.0, self._path_recompute_timer - dt)
+
+        # Trigger A* when stuck for more than 0.5 s and no current path
+        if (self.stuck_timer > 0.5 and not self.stuck_path
+                and self._path_recompute_timer <= 0):
+            self._recompute_path(player_pos, obstacles)
+            self._path_recompute_timer = 2.0
+
+        old_x, old_y = self.world_x, self.world_y
+
+        if self.stuck_path:
+            # Follow A* waypoints
+            wp = self.stuck_path[self.stuck_path_idx]
+            wdx = wp[0] - self.world_x
+            wdy = wp[1] - self.world_y
+            wdist = math.sqrt(wdx * wdx + wdy * wdy)
+            if wdist < TILE_SIZE:
+                self.stuck_path_idx += 1
+                if self.stuck_path_idx >= len(self.stuck_path):
+                    self.stuck_path = []
+                    self.stuck_timer = 0.0
+            elif wdist > 0:
+                nx = wdx / wdist * self.speed * dt
+                ny = wdy / wdist * self.speed * dt
+                self._try_move(nx, ny, obstacles, entities)
+        elif dist > TILE_SIZE * 0.5:
+            # Direct chase
             nx = dx / dist * self.speed * dt
             ny = dy / dist * self.speed * dt
             self._try_move(nx, ny, obstacles, entities)
+
+        # Update stuck timer
+        if self.world_x == old_x and self.world_y == old_y and dist > TILE_SIZE:
+            self.stuck_timer += dt
+        else:
+            self.stuck_timer = max(0.0, self.stuck_timer - dt * 2)
 
     def _do_boss_ai(self, dt, player_pos, obstacles, entities):
         dx = player_pos[0] - self.world_x
@@ -293,14 +348,47 @@ class Monster(pygame.sprite.Sprite):
             self.chase_timer -= dt
             if self.chase_timer <= 0 or dist > chase_range * 2:
                 self.is_chasing = False
+                self.stuck_path = []
+                self.stuck_timer = 0.0
                 return
 
-            # Move toward player
+            # Move toward player (with stuck/pathfinding logic)
             if dist > TILE_SIZE * 0.8:
-                speed = BOSS_CHASE_SPEED
-                nx = dx / dist * speed * dt
-                ny = dy / dist * speed * dt
-                self._try_move(nx, ny, obstacles, entities)
+                if dist < TILE_SIZE * 2:
+                    self.stuck_path = []
+                    self.stuck_timer = 0.0
+
+                self._path_recompute_timer = max(0.0, self._path_recompute_timer - dt)
+                if (self.stuck_timer > 0.5 and not self.stuck_path
+                        and self._path_recompute_timer <= 0):
+                    self._recompute_path(player_pos, obstacles)
+                    self._path_recompute_timer = 2.0
+
+                old_x, old_y = self.world_x, self.world_y
+
+                if self.stuck_path:
+                    wp = self.stuck_path[self.stuck_path_idx]
+                    wdx = wp[0] - self.world_x
+                    wdy = wp[1] - self.world_y
+                    wdist = math.sqrt(wdx * wdx + wdy * wdy)
+                    if wdist < TILE_SIZE:
+                        self.stuck_path_idx += 1
+                        if self.stuck_path_idx >= len(self.stuck_path):
+                            self.stuck_path = []
+                            self.stuck_timer = 0.0
+                    elif wdist > 0:
+                        nx = wdx / wdist * BOSS_CHASE_SPEED * dt
+                        ny = wdy / wdist * BOSS_CHASE_SPEED * dt
+                        self._try_move(nx, ny, obstacles, entities)
+                else:
+                    nx = dx / dist * BOSS_CHASE_SPEED * dt
+                    ny = dy / dist * BOSS_CHASE_SPEED * dt
+                    self._try_move(nx, ny, obstacles, entities)
+
+                if self.world_x == old_x and self.world_y == old_y and dist > TILE_SIZE:
+                    self.stuck_timer += dt
+                else:
+                    self.stuck_timer = max(0.0, self.stuck_timer - dt * 2)
 
     def _try_move(self, dx: float, dy: float, obstacles: list, entities: list):
         """Try to move by (dx, dy) with collision checking."""
@@ -334,10 +422,38 @@ class Monster(pygame.sprite.Sprite):
             self.world_y = resolved.midbottom[1] - self.collision_rect.height // 2
             self._update_collision_rect()
 
+    def _recompute_path(self, player_pos: tuple, obstacles: list):
+        """Compute an A* path around obstacles toward the player."""
+        from src.pathfind import build_walkable_grid, astar
+
+        # Use a 50×50 tile grid (combat stage size).  Town stages are larger
+        # but the same grid works — excess tiles are simply marked walkable.
+        grid_size = 50
+        grid = build_walkable_grid(obstacles, grid_size, grid_size, TILE_SIZE)
+
+        mx = max(0, min(grid_size - 1, int(self.world_x / TILE_SIZE)))
+        my = max(0, min(grid_size - 1, int(self.world_y / TILE_SIZE)))
+        px = max(0, min(grid_size - 1, int(player_pos[0] / TILE_SIZE)))
+        py = max(0, min(grid_size - 1, int(player_pos[1] / TILE_SIZE)))
+
+        path_tiles = astar(grid, (mx, my), (px, py))
+
+        if path_tiles and len(path_tiles) > 1:
+            # Convert tile coords to world-space centre of each tile, skip tile 0 (current)
+            self.stuck_path = [
+                ((tx + 0.5) * TILE_SIZE, (ty + 0.5) * TILE_SIZE)
+                for tx, ty in path_tiles[1:]
+            ]
+            self.stuck_path_idx = 0
+        else:
+            self.stuck_path = []
+
     def polymorph(self, new_type: str = None, duration: float = 30.0):
         """Transform this monster into a weaker type temporarily.
 
         If new_type is None, auto-selects the next-weaker type from POLYMORPH_PROGRESSION.
+        Bosses retain their is_boss flag; boss multipliers are re-applied to the new type's
+        base stats so they remain formidable but weaker.
         """
         if self.is_polymorphed:
             return  # Already polymorphed; ignore
@@ -358,16 +474,26 @@ class Monster(pygame.sprite.Sprite):
         self._original_hp = self.hp
         self._original_damage = self.damage
         self._original_speed = self.speed
-        # Apply new stats
+        self._original_is_boss = self.is_boss
+        # Apply new stats — bosses keep their multipliers on the weaker base stats
         self.monster_type = new_type
-        self.hp = new_stats["hp"]
-        self.max_hp = new_stats["hp"]
-        self.damage = new_stats["damage"]
+        base_hp = new_stats["hp"]
+        base_dmg = new_stats["damage"]
+        if self.is_boss:
+            self.hp = int(base_hp * BOSS_HP_MULT)
+            self.max_hp = self.hp
+            self.damage = int(base_dmg * BOSS_DAMAGE_MULT)
+        else:
+            self.hp = base_hp
+            self.max_hp = base_hp
+            self.damage = base_dmg
         self.speed = new_stats["speed"]
         self.is_polymorphed = True
         self.polymorph_timer = duration
         self.is_chasing = False
         self.is_enraged = False
+        self.stuck_path = []
+        self.stuck_timer = 0.0
         # Reload sprite for new type
         self.anim_set = self._load_animations()
 
@@ -380,8 +506,13 @@ class Monster(pygame.sprite.Sprite):
         self.max_hp = self._original_hp
         self.damage = self._original_damage
         self.speed = self._original_speed
+        # Restore boss flag if it was saved
+        if hasattr(self, '_original_is_boss'):
+            self.is_boss = self._original_is_boss
         self.is_polymorphed = False
         self.is_enraged = True  # Immediately pursue player
+        self.stuck_path = []
+        self.stuck_timer = 0.0
         # Reload sprite for original type
         self.anim_set = self._load_animations()
 
@@ -393,6 +524,8 @@ class Monster(pygame.sprite.Sprite):
             return True
         # Non-boss monsters permanently chase the player after surviving a hit
         if not self.is_boss:
+            if not self.is_enraged:
+                self._just_enraged = True
             self.is_enraged = True
         # Boss: start/extend chase timer as before
         if self.is_boss and not self.is_chasing:

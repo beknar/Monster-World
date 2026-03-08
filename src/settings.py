@@ -153,6 +153,12 @@ HERO_CHARACTERS = [
 DEFAULT_HERO_INDEX = 0
 
 # ---------------------------------------------------------------------------
+# Monster aggro constants
+# ---------------------------------------------------------------------------
+PROXIMITY_AGGRO_RANGE = 150   # pixels — player this close triggers idle monster aggro
+CHAIN_AGGRO_RANGE = 120       # pixels — enraged monster alerts nearby idle monsters
+
+# ---------------------------------------------------------------------------
 # Monster base stats
 # ---------------------------------------------------------------------------
 MONSTER_STATS = {

@@ -84,7 +84,7 @@
     "id": "dog_pelt",
     "name": "Dog Pelt",
     "type": "sellable",
-    "icon": "sellable",
+    "icon": "dog_pelt",
     "value": 12,
     "stack_max": 20,
     "description": "A rough pelt. Sell for gold."
@@ -93,7 +93,7 @@
     "id": "bandit_coin",
     "name": "Bandit Coin",
     "type": "sellable",
-    "icon": "sellable",
+    "icon": "bandit_coin",
     "value": 18,
     "stack_max": 20,
     "description": "Stolen coins. Sell for gold."
@@ -102,7 +102,7 @@
     "id": "soldier_medal",
     "name": "Soldier Medal",
     "type": "sellable",
-    "icon": "sellable",
+    "icon": "soldier_medal",
     "value": 30,
     "stack_max": 20,
     "description": "A military medal. Sell for gold."

@@ -372,8 +372,9 @@ class Player(pygame.sprite.Sprite):
         self.attack_timer = ATTACK_DURATION
         self._slash_trail = []  # Reset slash trail for new attack
 
-        # Ranged weapons don't create a melee hitbox
-        if self.equipped_weapon.is_ranged:
+        # Dual weapons (battle staff) fire both melee and ranged — fall through to hitbox.
+        # Pure ranged weapons have no melee hitbox.
+        if self.equipped_weapon.is_ranged and not self.equipped_weapon.is_dual:
             return None
 
         # Create attack hitbox in front of player based on facing direction

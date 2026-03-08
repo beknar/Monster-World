@@ -20,6 +20,8 @@ class WeaponData:
         # Ranged weapon properties
         self.projectile_speed = data.get("projectile_speed", 0)
         self.projectile_style = data.get("projectile_style", "arrow")
+        # Dual-attack: fires a projectile AND does a melee swing simultaneously
+        self.dual_attack = data.get("dual_attack", False)
         # Class restriction: list of hero IDs that can wield this weapon. Empty = all heroes.
         self.classes = data.get("classes", [])
 
@@ -27,6 +29,11 @@ class WeaponData:
     def is_ranged(self) -> bool:
         """Whether this weapon fires projectiles instead of melee swings."""
         return self.projectile_speed > 0
+
+    @property
+    def is_dual(self) -> bool:
+        """Whether this weapon fires a projectile AND does melee simultaneously."""
+        return self.dual_attack
 
 
 def load_weapon_database() -> dict:

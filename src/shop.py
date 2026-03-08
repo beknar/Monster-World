@@ -36,6 +36,13 @@ class Shop:
         self.gamepad_inv_index = 0
         self.controller_connected = False  # Set by game.py
 
+        # Hold-to-sell state
+        self._sell_hold_timer = 0.0
+        self._sell_hold_slot = -1
+        self._sell_initial_delay = 0.5    # seconds before auto-sell starts
+        self._sell_repeat_interval = 0.12  # seconds between repeated sells
+        self._sell_hold_triggered = False  # has the initial threshold been reached?
+
         # Layout
         self._recalc_layout()
 
@@ -75,7 +82,7 @@ class Shop:
         self.is_open = False
         self.message = ""
 
-    def update(self, dt: float, mouse_pos: tuple):
+    def update(self, dt: float, mouse_pos: tuple, player=None, audio=None):
         if self.message_timer > 0:
             self.message_timer -= dt
             if self.message_timer <= 0:
@@ -98,6 +105,33 @@ class Shop:
                 row = int(rel_y // (self.slot_size + self.slot_padding))
                 if 0 <= col < INVENTORY_COLS and 0 <= row < 5:
                     self.hovered_inv_slot = row * INVENTORY_COLS + col
+
+        # Hold-to-sell: continuously sell while left mouse button is held over an inv slot
+        if player and audio:
+            if pygame.mouse.get_pressed()[0] and self.hovered_inv_slot >= 0:
+                if self._sell_hold_slot != self.hovered_inv_slot:
+                    # Mouse moved to a different slot — reset timer
+                    self._sell_hold_slot = self.hovered_inv_slot
+                    self._sell_hold_timer = 0.0
+                    self._sell_hold_triggered = False
+                self._sell_hold_timer += dt
+                threshold = (self._sell_repeat_interval if self._sell_hold_triggered
+                             else self._sell_initial_delay)
+                if self._sell_hold_timer >= threshold:
+                    self._sell_hold_timer = 0.0
+                    self._sell_hold_triggered = True
+                    stack = player.inventory.get_slot(self._sell_hold_slot)
+                    if stack:
+                        sell_price = stack.item_data.value
+                        player.inventory.remove_item(self._sell_hold_slot, 1)
+                        player.gold += sell_price
+                        audio.play_sfx("coin")
+                        self._show_message(f"Sold for {sell_price}g")
+            else:
+                # Button released or not over a slot — reset hold state
+                self._sell_hold_slot = -1
+                self._sell_hold_timer = 0.0
+                self._sell_hold_triggered = False
 
     def handle_click(self, mouse_pos: tuple, button: int, player, audio) -> bool:
         """Handle mouse click in shop. Returns True if something happened."""

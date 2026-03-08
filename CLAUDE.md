@@ -51,6 +51,7 @@ claude-rpg/
 │   ├── audio.py                     # Music and sound effect manager
 │   ├── hud.py                       # Health bar, XP bar, level display, equipped weapon/armor, gold count
 │   ├── projectile.py               # Projectile class (arrows, bullets) for ranged weapons
+│   ├── pathfind.py                 # A* pathfinding for monster obstacle avoidance
 │   ├── savegame.py                 # Save/Load/Delete game functionality (JSON persistence)
 │   └── spritesheet.py              # Sprite sheet loading and frame extraction
 ├── saves/                           # Save game files (JSON, auto-created at runtime)
@@ -344,7 +345,7 @@ The Mage hero fires purple magic projectiles instead of swinging a melee weapon,
 ### Movement
 - **Player:** WASD controls. Has walk and idle animations for 4 directions. Speed is always slightly faster than any boss.
 - **NPCs:** Either stand still (idle animation) or patrol in defined patterns (walk animation). In towns, ~40% of NPCs patrol while the rest stand idle.
-- **Monsters:** Either stand still (idle animation) or move in defined patterns. Bosses can chase the player. **Any non-boss monster that survives a hit permanently switches to enraged chase mode**, following the player at its full speed until it dies (`is_enraged` flag set in `take_damage()`, handled by `_do_enraged_chase()` in `update()`).
+- **Monsters:** Either stand still (idle animation) or move in defined patterns. Bosses can chase the player. **Any non-boss monster that survives a hit permanently switches to enraged chase mode**, following the player at its full speed until it dies (`is_enraged` flag set in `take_damage()`, handled by `_do_enraged_chase()` in `update()`). **Proximity aggro:** if a player walks within `PROXIMITY_AGGRO_RANGE = 150` pixels of any idle non-boss monster, the monster immediately becomes enraged and starts chasing. **Chain aggro:** when a monster first becomes enraged (from damage or proximity), it activates all idle non-boss monsters within `CHAIN_AGGRO_RANGE = 120` pixels, causing them to also enrage — this propagates transitively within one frame via the `_just_enraged` flag checked in `game.py` after each monster update. **A\* obstacle avoidance:** when an enraged monster or boss gets stuck behind an obstacle (no movement progress for 0.5 seconds), it triggers `_recompute_path()` which uses A\* (`src/pathfind.py`) to compute a tile-grid path around the obstacle. The monster then follows waypoints until clear, then resumes direct chase. Path is recomputed at most every 2 seconds.
 - All entities have **multi-frame idle animations** (4-frame breathing cycle: stand→walk1→stand→walk2 at 2.5x slower speed) even when stationary, so they never look frozen.
 - All moving entities use walk/run animations while in motion.
 
@@ -353,6 +354,8 @@ The Mage hero fires purple magic projectiles instead of swinging a melee weapon,
 - Entities cannot move through each other (player, NPCs, monsters)
 - Use axis-aligned bounding box (AABB) collision detection
 - Object collision rects are shrunk by 20% per side (`inflate_ip(-shrink*2, -shrink*2)` where `shrink = int(TILE_SIZE * 0.2)`) so they better match the visible sprite size rather than covering the full tile
+- **Monster collision rects:** 85% of sprite width and 70% of sprite height (was 70%/50%), centered on the sprite. This makes melee and ranged attacks connect more reliably when they visually appear to hit. `src/monster.py` `__init__()`: `self.collision_rect = pygame.Rect(0, 0, int(w * 0.85), int(h * 0.70))`.
+- **Projectile collision rects:** 16×16 pixels (was 8×8), centered on the projectile position. `src/projectile.py`: `self.collision_rect = pygame.Rect(0, 0, 16, 16)`.
 - **Decorative objects (Flowers, Tall_grass) are NOT the cause of invisible collisions.** They have `"decorative": True` in `OBJECT_DEFS` and are never added to `stage.obstacle_rects`, so they have no collision at all. `draw_objects()` uses `settings.SCREEN_WIDTH/HEIGHT` (not hardcoded values) for viewport culling, so rendering correctly covers the visible area at all resolutions. If invisible collisions occur, the most likely cause is a non-decorative obstacle whose sprite is fully occluded by an adjacent larger object (e.g., a rock hidden behind a tree) — both have independent collision rects.
 
 ### Combat System
@@ -509,7 +512,7 @@ The shield system absorbs raw incoming damage before armor is applied.
 - `player.shield_hp` (int): Current shield absorption points (0 = no shield).
 - When damage is taken, `shield_hp` absorbs first: `absorbed = min(shield_hp, raw_damage)`. Any remaining damage proceeds through armor calculation.
 - Shields are set by spells/abilities: Mage Shield = 100 HP, Paladin Holy Shield = 50 HP, Warrior Steel Skin = 100 HP.
-- **Visual:** Pulsing blue circle drawn around the player while `shield_hp > 0`.
+- **Visual:** Pulsing blue circle drawn around the player while `shield_hp > 0`. The circle is centered at the sprite's vertical midpoint (`py - TILE_SIZE * 0.75`, i.e. half the 1.5×TILE_SIZE sprite height above the feet) with radius `TILE_SIZE * 1.05 + pulse * 4` (~50–54 px at TILE_SIZE=48). This ensures the shield bubble visually covers the full character sprite rather than just the lower half. Implemented in `game._draw_persistent_buffs()`.
 - Shield HP is saved/loaded with game state.
 - **Blazing Sword visual:** While `blazing_sword_timer > 0`, `_draw_persistent_buffs()` draws 6 animated flame-polygon "tongues" extending 100px from the player in their facing direction. Each tongue uses three nested polygon layers (deep red → orange → yellow) that flicker independently via `sin(time + index)` phase offsets, plus a bright white-yellow core line. No external library required — rendered entirely with `pygame.draw.polygon` and a full-screen SRCALPHA surface.
 
@@ -545,8 +548,9 @@ All 4 hero classes gain a resurrection ability at level 20. These **auto-trigger
 Spells and abilities can apply special states to monsters:
 
 **Polymorph** (Mage spell, level 9):
-- Transforms the nearest monster to the next-weaker type in `POLYMORPH_PROGRESSION = ["wild_cat", "wild_dog", "bandit", "soldier", "guard", "commander"]`.
-- Example: soldier → bandit, guard → soldier.
+- Transforms the nearest monster (including bosses) to the next-weaker type in `POLYMORPH_PROGRESSION = ["wild_cat", "wild_dog", "bandit", "soldier", "guard", "commander"]`.
+- Example: soldier → bandit, guard → soldier. A commander boss → guard-type boss.
+- **Boss polymorph:** Bosses can now be targeted (previously excluded). When a boss is polymorphed, the `is_boss` flag is preserved and `BOSS_HP_MULT` / `BOSS_DAMAGE_MULT` are re-applied to the new type's base stats. The `_original_is_boss` attribute saves the flag for restoration. On revert, the boss returns to its original type with `is_boss` restored, at half HP with `is_enraged = True`. HUD shows "Boss Polymorphed to {new_type}!" message.
 - Duration: 30 seconds. On revert, monster returns at half its original HP with `is_enraged = True`.
 - Visual: Purple pulsing ring around the monster.
 - `monster.polymorph(new_type, duration)` and `_revert_polymorph()` methods in `monster.py`.
@@ -582,6 +586,7 @@ Define in `data/weapons.json`. Each weapon has:
 - `sound_hit`: Sound effect on contact
 - `projectile_speed` (ranged only): Projectile travel speed in pixels/sec. A weapon is considered ranged if `projectile_speed > 0`.
 - `projectile_style` (ranged only): `"arrow"`, `"bullet"`, or `"magic"`
+- `dual_attack` (optional, bool): If `true`, the weapon performs a melee swing AND fires a projectile simultaneously on each attack. Used by Battle Staff. Checked via `weapon.is_dual` property in `src/weapon.py`. In `game._do_attack()`, dual weapons execute the full melee combat pass and then additionally spawn a projectile.
 - `classes` (optional): List of hero IDs that can wield this weapon. Omitted or empty = all heroes. E.g., `["warrior"]`, `["warrior", "paladin"]`. Enforced in `player.equip_weapon()` — returns `False` on failure (same pattern as armor), showing "Cannot wield {name}!" in the HUD.
 
 **Weapon class restrictions:**
@@ -616,10 +621,13 @@ Warrior and Paladin both start with Basic Sword. Class restrictions are shown in
 - **gun**: Metal barrel + body + handle. Fires bullet projectiles with muzzle flash effect.
 - **staff (ranged)**: Staff with `projectile_speed > 0` (e.g., mage_bolt). Fires magic projectiles (purple glowing orb). Staff visual with purple muzzle flash.
 
+**Dual-attack weapons** (`dual_attack: true` in `weapons.json`): Perform a melee swing AND fire a projectile on the same attack input. The weapon is not considered purely ranged — `is_ranged` returns `True` (projectile_speed > 0) but `is_dual` also returns `True`. In `_do_attack()`, the melee hitbox is calculated first, then a projectile is spawned in the player's facing direction. Currently only: **Battle Staff** (Mage, 40 dmg, 300px range, projectile_speed 350, magic style).
+
 Weapon surfaces are cached by `(style, blade_color, angle)` to maintain 60 FPS performance.
 
 **Projectile system** (`src/projectile.py`):
 - Projectiles travel in the player's facing direction at `projectile_speed`
+- **Projectile collision rect: 16×16 pixels** (centered on projectile center). This wider hitbox gives more reliable hit detection when visually near a monster.
 - Projectiles collide with obstacles (walls, objects), monsters, and treasure chests
 - On monster hit: apply damage, destroy projectile
 - On chest hit: apply damage to chest, destroy projectile; if chest is destroyed, spawn loot
@@ -630,6 +638,23 @@ Weapon surfaces are cached by `(style, blade_color, angle)` to maintain 60 FPS p
 - All projectile styles have trailing particle effects
 
 Bigger/rarer weapons deal more damage and may have more range. Player starts with a default weapon based on their hero class (Warrior: basic sword, Mage: mage bolt staff, Ranger: crossbow, Paladin: basic sword).
+
+### A* Pathfinding (`src/pathfind.py`)
+
+Lightweight A* pathfinding used by enraged monsters and bosses to navigate around obstacles when they get stuck.
+
+**Module functions:**
+- `build_walkable_grid(obstacles, grid_cols, grid_rows, tile_size)` — Rasterises a list of obstacle `pygame.Rect`s onto a 2D boolean grid (`True` = walkable). Grid is sized to the stage's tile dimensions.
+- `astar(grid, start, goal)` — Standard heap-based A* on the boolean grid with 4-directional movement. Returns a list of `(col, row)` tile coordinates from start to goal inclusive, or `None` if no path exists. Clamps out-of-bounds start/goal to grid edges and snaps blocked tiles to nearest walkable via BFS.
+- `_nearest_walkable(grid, x, y, cols, rows)` — BFS outward to find the nearest walkable tile (used internally to handle blocked start/goal positions).
+
+**Integration in `src/monster.py`:**
+- Enraged monsters and bosses accumulate `stuck_timer` when their world position does not change after `_try_move()`.
+- When `stuck_timer > 0.5s` and `_path_recompute_timer <= 0`, `_recompute_path(player_pos, obstacles)` is called. This builds the walkable grid from current obstacles, runs A*, and converts the tile path to world-space waypoints (tile center coordinates).
+- The monster follows waypoints in `stuck_path` until the path is exhausted or the player position changes significantly, then resumes direct chase.
+- Path recomputation is rate-limited to once every 2 seconds (`_path_recompute_timer`).
+- State fields on Monster: `stuck_timer` (float), `stuck_path` (list of world-coord tuples), `stuck_path_idx` (int), `_path_recompute_timer` (float).
+- Constants in `src/settings.py`: `PROXIMITY_AGGRO_RANGE = 150` (px), `CHAIN_AGGRO_RANGE = 120` (px).
 
 ### Items
 
@@ -664,6 +689,11 @@ Items are defined in `data/items.json`. Every item has:
 - Food: `newassets/objects/Mushroom_1-4.png`, Crops (Berries, Carrot, Sunflower)
 - Chests (loot containers): `newassets/objects/Chest_big.png`, `Chest_small.png`
 - Icons for inventory UI: `newassets/icons/`
+
+**Sellable item procedural icons** (40×40 SRCALPHA surfaces generated in `game._load_item_icons()`):
+- **`bandit_coin`** — Crude bronze/gold coin: outer jagged circle (12-point star polygon), inner flat circle, rough "X" mark in center, dark gold palette.
+- **`dog_pelt`** — Animal hide: irregular 10-point brown polygon (asymmetric, scraggly), lighter inner concentric polygon, short dark "fur" lines radiating from edges.
+- **`soldier_medal`** — Ribbon medal: red/blue vertical ribbon strip at top, circular gold medal body below, small 5-pointed star in center, thin border ring. Icons are keyed by `"icon"` field in `data/items.json` (values: `"bandit_coin"`, `"dog_pelt"`, `"soldier_medal"`) and looked up in `game._item_icons` dict.
 
 ### Armor System
 
@@ -818,6 +848,7 @@ Stage 1 (combat) → Town 1 (shop) → Stage 2 (combat) → Town 2 (shop) → ..
 - **Controller shop navigation:** D-pad navigates items, A button buys/sells, LB/RB or D-pad left/right switches panels, B/Back/START closes shop. Gold cursor highlights active item. Panel titles adapt to show controller instructions.
 - Shop inventories defined in `data/shops.json` per town stage. Later towns sell better/rarer items at higher prices.
 - Selling price = item `value`. Buying price = item `value` (or a markup, e.g., 1.5x value).
+- **Hold-to-sell:** Holding the left mouse button on a player inventory slot in the shop continuously sells items from that slot. Initial delay: 0.5 seconds before repeat begins; then one item sold every 0.12 seconds until the stack is empty or the button is released. Implemented via `shop.update(dt, mouse_pos, player, audio)` called each frame, using `pygame.mouse.get_pressed()[0]` and tracking `_sell_hold_timer`, `_sell_hold_slot`, `_sell_hold_triggered` state. `game.py` calls `self.active_shop.update(dt, pygame.mouse.get_pos(), self.player, self.audio)` when the shop is open.
 - Weapons, armor, consumables, and sellable items can be bought and sold. Armor progresses from leather (early towns) to full plate (final town).
 - Sound effects: `newassets/sounds/game/Gold1.wav` for transactions, `newassets/sounds/menu/Accept1.wav` for confirm
 
