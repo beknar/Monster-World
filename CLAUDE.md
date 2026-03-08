@@ -30,6 +30,7 @@ Always activate the venv before running or installing packages.
 ```
 claude-rpg/
 ├── CLAUDE.md
+├── README.md                        # Public-facing project overview, install and run instructions
 ├── main.py                          # Game entry point
 ├── venv/                            # Python virtual environment
 ├── src/                             # Game source code
