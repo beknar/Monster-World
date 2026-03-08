@@ -1135,3 +1135,21 @@ All character and monster sprites are **sprite sheets** (multiple frames in a si
 - All asset paths in `src/settings.py` must point into `newassets/` — no other asset directories
 - Stage data stored externally (JSON) so stages can be edited without code changes
 - Keep game loop in `src/game.py`: handle input -> update -> draw -> clock tick
+
+## Credits and Licensing
+
+### Visual Assets — Time Fantasy
+All tilesets, character sprites, monster sprites, NPC sprites, object sprites, and other visual assets were purchased from **Time Fantasy** by finalbossblues.
+
+- **Product site:** https://timefantasy.net
+- **Artist's website:** https://finalbossblues.com
+- **Twitter:** @finalbossblues
+- **Facebook:** finalbossblues
+
+Assets are used under the terms of the Time Fantasy commercial license. All asset files reside under `newassets/` (heroes, monsters, npcs, tileset, objects, icons, sounds).
+
+### Music — Fantasy RPG Complete OST
+Background music is from the **Fantasy RPG Complete OST** by VHCMusic, stored under `newassets/Fantasy RPG Complete OST/`. Used under their respective license terms.
+
+### Code
+All game source code (`src/`, `main.py`, `data/`) is the author's own work.

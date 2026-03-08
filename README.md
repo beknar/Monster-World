@@ -198,7 +198,22 @@ Monster-World/
 
 ---
 
-## License
+## Credits and Licensing
 
-Assets from the **Fantasy RPG Complete OST** by VHCMusic are used under their respective license terms.
+### Visual Assets — Time Fantasy
+All tilesets, character sprites, monster sprites, NPC sprites, objects, and other visual assets were purchased from **Time Fantasy** by finalbossblues.
+
+| | |
+|---|---|
+| **Product site** | [timefantasy.net](https://timefantasy.net) |
+| **Artist's website** | [finalbossblues.com](https://finalbossblues.com) |
+| **Twitter** | [@finalbossblues](https://twitter.com/finalbossblues) |
+| **Facebook** | [finalbossblues](https://www.facebook.com/finalbossblues) |
+
+Assets are used under the terms of the Time Fantasy commercial license.
+
+### Music — Fantasy RPG Complete OST
+Background music tracks are from the **Fantasy RPG Complete OST** by VHCMusic, used under their respective license terms.
+
+### Code
 All game code is the author's own work.
