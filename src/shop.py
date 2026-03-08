@@ -319,31 +319,42 @@ class Shop:
         self._draw_inv_panel(surface, player, item_icons, font)
 
         # Item tooltip above the panels.
-        # Priority: mouse hover (most intentional) > gamepad cursor.
-        # Previously the if/elif used gamepad_panel first, which defaults to
-        # "shop" and prevented inventory hover tooltips from ever appearing.
+        # Priority (highest to lowest):
+        #   1. Mouse hovering an inventory slot that has an item
+        #   2. Mouse hovering a shop item
+        #   3. Gamepad cursor on the inventory panel
+        #   4. Gamepad cursor on the shop panel
+        #
+        # Each level only fires when the levels above it yielded no tooltip.
+        # Using "if not tooltip_lines" rather than "elif" is critical: when the
+        # mouse is over an EMPTY inventory slot, hovered_inv_slot >= 0 is True
+        # but produces no lines. Without the fallthrough, the gamepad-cursor
+        # tooltip would be silently suppressed — causing the tooltip to vanish
+        # whenever the mouse drifts over any empty slot.
         tooltip_lines = []
+
+        # 1. Mouse hover — inventory slot with an item
         if self.hovered_inv_slot >= 0:
-            # Mouse is over player inventory — show inv tooltip regardless of gamepad state
             stack = player.inventory.get_slot(self.hovered_inv_slot)
             if stack:
                 tooltip_lines = self._build_item_tooltip_lines(stack.item_data)
-        elif self.hovered_shop_item >= 0:
-            # Mouse is over shop panel
+
+        # 2. Mouse hover — shop item
+        if not tooltip_lines and self.hovered_shop_item >= 0:
             entry = self.entries[self.hovered_shop_item]
             tooltip_lines = self._build_item_tooltip_lines(
                 entry.item_data, buy_price=entry.buy_price)
-        elif self.gamepad_panel == "inv":
-            # Gamepad cursor is on inventory (no mouse hover active)
-            idx = self.gamepad_inv_index
-            stack = player.inventory.get_slot(idx)
+
+        # 3. Gamepad cursor on inventory panel
+        if not tooltip_lines and self.gamepad_panel == "inv":
+            stack = player.inventory.get_slot(self.gamepad_inv_index)
             if stack:
                 tooltip_lines = self._build_item_tooltip_lines(stack.item_data)
-        elif self.gamepad_panel == "shop":
-            # Gamepad cursor is on shop panel (no mouse hover active)
-            idx = self.gamepad_shop_index
-            if 0 <= idx < len(self.entries):
-                entry = self.entries[idx]
+
+        # 4. Gamepad cursor on shop panel
+        if not tooltip_lines and self.gamepad_panel == "shop":
+            if 0 <= self.gamepad_shop_index < len(self.entries):
+                entry = self.entries[self.gamepad_shop_index]
                 tooltip_lines = self._build_item_tooltip_lines(
                     entry.item_data, buy_price=entry.buy_price)
         if tooltip_lines:
