@@ -641,19 +641,20 @@ Bigger/rarer weapons deal more damage and may have more range. Player starts wit
 
 ### A* Pathfinding (`src/pathfind.py`)
 
-Lightweight A* pathfinding used by enraged monsters and bosses to navigate around obstacles when they get stuck.
+Lightweight A* pathfinding used by enraged monsters and bosses to navigate around obstacles. Uses **proactive pathfinding** — paths are always maintained and refreshed every 1.5 seconds rather than waiting for a monster to get completely stuck first.
 
 **Module functions:**
 - `build_walkable_grid(obstacles, grid_cols, grid_rows, tile_size)` — Rasterises a list of obstacle `pygame.Rect`s onto a 2D boolean grid (`True` = walkable). Grid is sized to the stage's tile dimensions.
 - `astar(grid, start, goal)` — Standard heap-based A* on the boolean grid with 4-directional movement. Returns a list of `(col, row)` tile coordinates from start to goal inclusive, or `None` if no path exists. Clamps out-of-bounds start/goal to grid edges and snaps blocked tiles to nearest walkable via BFS.
+- `has_los(grid, start_tile, goal_tile)` — Bresenham line-of-sight check on the tile grid. Returns `True` if the straight line between two tiles passes through no blocked tiles. Used as a performance shortcut: when LOS is clear, the monster chases directly without needing to follow A* waypoints.
 - `_nearest_walkable(grid, x, y, cols, rows)` — BFS outward to find the nearest walkable tile (used internally to handle blocked start/goal positions).
 
 **Integration in `src/monster.py`:**
-- Enraged monsters and bosses accumulate `stuck_timer` when their world position does not change after `_try_move()`.
-- When `stuck_timer > 0.5s` and `_path_recompute_timer <= 0`, `_recompute_path(player_pos, obstacles)` is called. This builds the walkable grid from current obstacles, runs A*, and converts the tile path to world-space waypoints (tile center coordinates).
-- The monster follows waypoints in `stuck_path` until the path is exhausted or the player position changes significantly, then resumes direct chase.
-- Path recomputation is rate-limited to once every 2 seconds (`_path_recompute_timer`).
-- State fields on Monster: `stuck_timer` (float), `stuck_path` (list of world-coord tuples), `stuck_path_idx` (int), `_path_recompute_timer` (float).
+- **Proactive approach:** When `is_enraged` first becomes `True` (from damage, proximity aggro, or chase start), `_path_recompute_timer` is reset to 0, triggering an immediate A* path computation on the next update frame.
+- **1.5s refresh:** Every 1.5 seconds during chase, `_recompute_path()` recomputes the A* path regardless of whether the monster is moving or stuck. This eliminates the "stuck for 0.5s before routing" delay of the previous approach.
+- **LOS shortcut:** Each frame, `has_los()` checks for a clear direct line to the player. If LOS is clear, the monster chases directly (natural movement); if blocked, it follows the A* waypoint path.
+- **Dynamic grid size:** `_recompute_path()` derives grid size from actual obstacle extents (`max obstacle tile + 2`) instead of a hardcoded 50×50 — correctly covers both combat stages (50 tiles) and large town stages (up to 80 tiles). Capped at 120 to bound computation cost.
+- State fields on Monster: `stuck_path` (list of world-coord tuples), `stuck_path_idx` (int), `_path_recompute_timer` (float).
 - Constants in `src/settings.py`: `PROXIMITY_AGGRO_RANGE = 150` (px), `CHAIN_AGGRO_RANGE = 120` (px).
 
 ### Items
@@ -691,9 +692,13 @@ Items are defined in `data/items.json`. Every item has:
 - Icons for inventory UI: `newassets/icons/`
 
 **Sellable item procedural icons** (40×40 SRCALPHA surfaces generated in `game._load_item_icons()`):
+- **`cat_fang`** — Curved ivory fang: narrow tapered polygon with rounded root, dark pointed tip, center groove line, red root band at top.
 - **`bandit_coin`** — Crude bronze/gold coin: outer jagged circle (12-point star polygon), inner flat circle, rough "X" mark in center, dark gold palette.
 - **`dog_pelt`** — Animal hide: irregular 10-point brown polygon (asymmetric, scraggly), lighter inner concentric polygon, short dark "fur" lines radiating from edges.
-- **`soldier_medal`** — Ribbon medal: red/blue vertical ribbon strip at top, circular gold medal body below, small 5-pointed star in center, thin border ring. Icons are keyed by `"icon"` field in `data/items.json` (values: `"bandit_coin"`, `"dog_pelt"`, `"soldier_medal"`) and looked up in `game._item_icons` dict.
+- **`soldier_medal`** — Ribbon medal: red/blue vertical ribbon strip at top, circular gold medal body below, small 5-pointed star in center, thin border ring.
+- **`guard_badge`** — Shield badge: hexagonal dark-blue badge shape, gold horizontal bar across upper third, white 5-pointed star in lower half, silver border, gold outer ring.
+- **`commander_insignia`** — Military insignia: dark navy circle background, gold spread-wing shape (two angled polygons), center gold circle, 5 gold sunburst rays radiating above the wings.
+- **`crystal`** — Glowing gem: tall 6-sided icy blue diamond polygon, lighter left facet, white top highlight facet, sparkle lines, three concentric alpha-circle glow halos in cyan/blue. Icons are keyed by `"icon"` field in `data/items.json` and looked up in `game._item_icons` dict.
 
 ### Armor System
 
@@ -848,7 +853,9 @@ Stage 1 (combat) → Town 1 (shop) → Stage 2 (combat) → Town 2 (shop) → ..
 - **Controller shop navigation:** D-pad navigates items, A button buys/sells, LB/RB or D-pad left/right switches panels, B/Back/START closes shop. Gold cursor highlights active item. Panel titles adapt to show controller instructions.
 - Shop inventories defined in `data/shops.json` per town stage. Later towns sell better/rarer items at higher prices.
 - Selling price = item `value`. Buying price = item `value` (or a markup, e.g., 1.5x value).
-- **Hold-to-sell:** Holding the left mouse button on a player inventory slot in the shop continuously sells items from that slot. Initial delay: 0.5 seconds before repeat begins; then one item sold every 0.12 seconds until the stack is empty or the button is released. Implemented via `shop.update(dt, mouse_pos, player, audio)` called each frame, using `pygame.mouse.get_pressed()[0]` and tracking `_sell_hold_timer`, `_sell_hold_slot`, `_sell_hold_triggered` state. `game.py` calls `self.active_shop.update(dt, pygame.mouse.get_pos(), self.player, self.audio)` when the shop is open.
+- **Hold-to-sell (mouse):** Holding the left mouse button on a player inventory slot in the shop continuously sells items from that slot. Initial delay: 0.5 seconds before repeat begins; then one item sold every 0.12 seconds until the stack is empty or the button is released. Implemented via `shop.update(dt, mouse_pos, player, audio)` called each frame, using `pygame.mouse.get_pressed()[0]` and tracking `_sell_hold_timer`, `_sell_hold_slot`, `_sell_hold_triggered` state. `game.py` calls `self.active_shop.update(dt, pygame.mouse.get_pos(), self.player, self.audio)` when the shop is open.
+- **Hold-to-sell (controller):** Holding the A button while the gamepad cursor is on the inventory panel continuously sells items with the same timing (0.5s initial delay, 0.12s repeat). Tracked via `_shop_ctrl_hold_timer`, `_shop_ctrl_hold_triggered`, `_shop_ctrl_hold_initial`, `_shop_ctrl_hold_interval` in `game.py`. Checked each frame using `joystick.get_button(CONTROLLER_BUTTON_ATTACK)` in the shop update block.
+- **Shop inventory hover tooltip:** Fixed if/elif priority bug — previously `gamepad_panel == "shop"` (always True by default) prevented mouse-hover inventory tooltips from appearing. Now mouse hover state (`hovered_inv_slot`, `hovered_shop_item`) takes highest priority over gamepad panel state, so hovering the player inventory always shows the correct item tooltip.
 - Weapons, armor, consumables, and sellable items can be bought and sold. Armor progresses from leather (early towns) to full plate (final town).
 - Sound effects: `newassets/sounds/game/Gold1.wav` for transactions, `newassets/sounds/menu/Accept1.wav` for confirm
 
@@ -859,6 +866,25 @@ Stage 1 (combat) → Town 1 (shop) → Stage 2 (combat) → Town 2 (shop) → ..
 - **Per-hero XP multiplier:** `xp_required_mult` in `HERO_CHARACTERS` scales how much XP is needed to level. Warrior and Ranger have `xp_required_mult: 0.667` (need only 2/3 of base XP). Mage and Paladin default to 1.0. Applied in `player.gain_xp()` and the HUD XP bar via `hud._get_xp_for_next/current(level, xp_mult)`.
 - On level up: max HP increases, damage may increase. HUD message shown if a new spell/ability just unlocked.
 - Display current level, XP progress, and HP on the HUD
+
+### Death Animation
+
+When the player's HP reaches 0 (and no resurrection ability fires), the game enters `STATE_DYING` for 1.5 seconds before transitioning to `STATE_GAME_OVER`. No hero die-sprite sheets exist in the asset library, so the death animation is procedural.
+
+**Visual effect** (`game._draw_dying()`):
+- The world is drawn normally in the background (other entities remain visible)
+- The player sprite is drawn with:
+  - **Red tint** — increasing from 0 → 190 alpha overlay as `t` goes 0 → 1
+  - **Fade out** — alpha subtracted proportionally so the sprite becomes transparent by the end
+  - **Spin** — the sprite rotates clockwise 0 → 180 degrees over the 1.5s duration
+- After 1.5 seconds, transitions to `STATE_GAME_OVER` which draws the red "GAME OVER" overlay
+
+**Game states involved:**
+- `STATE_DYING = "dying"` — new state added between `STATE_PLAYING` and `STATE_GAME_OVER`
+- `game._dying_timer` (float): elapsed seconds in dying state
+- `game._dying_duration = 1.5`: duration of the animation
+- All player input is blocked during `STATE_DYING` (the state has no input handlers)
+- Music auto-continue is suppressed in `STATE_DYING` (same as `STATE_GAME_OVER`)
 
 ### Hit Points
 - **Player:** Starts with base HP, gains more per level

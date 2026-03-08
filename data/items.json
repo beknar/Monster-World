@@ -75,7 +75,7 @@
     "id": "cat_fang",
     "name": "Cat Fang",
     "type": "sellable",
-    "icon": "sellable",
+    "icon": "cat_fang",
     "value": 8,
     "stack_max": 20,
     "description": "A sharp fang. Sell for gold."
@@ -111,7 +111,7 @@
     "id": "guard_badge",
     "name": "Guard Badge",
     "type": "sellable",
-    "icon": "sellable",
+    "icon": "guard_badge",
     "value": 45,
     "stack_max": 20,
     "description": "An official badge. Sell for gold."
@@ -120,7 +120,7 @@
     "id": "commander_insignia",
     "name": "Commander Insignia",
     "type": "sellable",
-    "icon": "sellable",
+    "icon": "commander_insignia",
     "value": 70,
     "stack_max": 20,
     "description": "A rare military insignia. Very valuable."
@@ -129,7 +129,7 @@
     "id": "crystal",
     "name": "Crystal",
     "type": "sellable",
-    "icon": "sellable",
+    "icon": "crystal",
     "value": 75,
     "stack_max": 20,
     "description": "A glowing crystal. Sell for gold."

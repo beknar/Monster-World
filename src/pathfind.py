@@ -106,6 +106,51 @@ def astar(grid: List[List[bool]],
     return None  # No path found
 
 
+def has_los(grid: List[List[bool]], start: Tuple[int, int],
+            goal: Tuple[int, int]) -> bool:
+    """Return True if there is a clear line-of-sight between two tile coords.
+
+    Uses Bresenham's line algorithm to walk tiles between start and goal.
+    If any tile is blocked (grid[row][col] == False) the LOS is interrupted.
+
+    Args:
+        grid:   grid[row][col], True = walkable.
+        start:  (col, row) source tile.
+        goal:   (col, row) destination tile.
+    """
+    if not grid:
+        return False
+
+    rows = len(grid)
+    cols = len(grid[0]) if rows else 0
+
+    x0, y0 = start
+    x1, y1 = goal
+
+    dx = abs(x1 - x0)
+    dy = abs(y1 - y0)
+    sx = 1 if x0 < x1 else -1
+    sy = 1 if y0 < y1 else -1
+    err = dx - dy
+
+    while True:
+        if not (0 <= x0 < cols and 0 <= y0 < rows):
+            return False  # out of bounds — no LOS
+        if not grid[y0][x0]:
+            return False  # blocked tile
+
+        if x0 == x1 and y0 == y1:
+            return True  # reached goal
+
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x0 += sx
+        if e2 < dx:
+            err += dx
+            y0 += sy
+
+
 def _nearest_walkable(grid: List[List[bool]], x: int, y: int,
                       cols: int, rows: int) -> Tuple[int, int]:
     """BFS outward from (x, y) to find the nearest walkable tile."""

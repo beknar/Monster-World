@@ -190,6 +190,7 @@ class Game:
     STATE_SHOP = "shop"
     STATE_PAUSED = "paused"
     STATE_GAME_OVER = "game_over"
+    STATE_DYING = "dying"          # Death animation plays before game-over screen
     STATE_WIN = "win"
     STATE_SAVE_DIALOG = "save_dialog"
     STATE_LOAD_DIALOG = "load_dialog"
@@ -293,6 +294,16 @@ class Game:
         self.controller_connected = False
         self._init_controller()
 
+        # Death animation timer (STATE_DYING)
+        self._dying_timer = 0.0
+        self._dying_duration = 1.5   # seconds before transitioning to STATE_GAME_OVER
+
+        # Controller hold-to-sell state (for shop inventory panel)
+        self._shop_ctrl_hold_timer = 0.0
+        self._shop_ctrl_hold_triggered = False
+        self._shop_ctrl_hold_initial = 0.5    # seconds before repeat starts
+        self._shop_ctrl_hold_interval = 0.12  # seconds between repeated sells
+
         # Play menu music
         self.audio.play_music("menu")
 
@@ -380,8 +391,9 @@ class Game:
 
     def _on_music_ended(self):
         """Called when a music track finishes. Auto-continues to the next track."""
-        # Don't auto-continue in menu, game over, or win states (they manage their own music)
-        if self.state in (self.STATE_MENU, self.STATE_GAME_OVER, self.STATE_WIN):
+        # Don't auto-continue in menu, game over, dying, or win states
+        if self.state in (self.STATE_MENU, self.STATE_GAME_OVER,
+                          self.STATE_DYING, self.STATE_WIN):
             return
         # If in boss area or boss is chasing, replay boss music only if boss is still alive
         if self.in_boss_area or self.boss_chasing:
@@ -563,6 +575,97 @@ class Game:
         pygame.draw.polygon(img, (255, 235, 100), _star_pts)
         pygame.draw.circle(img, (240, 210, 120), (cx - 4, cx), 3)
         self.item_icons["soldier_medal"] = img
+
+        # --- Cat Fang: curved ivory fang with dark tip and red root ---
+        img = pygame.Surface((icon_size, icon_size), pygame.SRCALPHA)
+        # Fang body: tapered curved polygon (wide at top, narrow at bottom)
+        fang_pts = [(cx - 5, 4), (cx + 5, 4), (cx + 7, 10),
+                    (cx + 3, 22), (cx + 1, 32), (cx, 36),
+                    (cx - 1, 32), (cx - 3, 22), (cx - 7, 10)]
+        pygame.draw.polygon(img, (235, 225, 200), fang_pts)  # ivory fill
+        # Darker groove line down centre
+        pygame.draw.line(img, (180, 165, 140), (cx, 6), (cx, 33), 1)
+        # Dark pointed tip
+        tip_pts = [(cx - 2, 30), (cx + 2, 30), (cx, 37)]
+        pygame.draw.polygon(img, (90, 70, 50), tip_pts)
+        # Red root band at the base
+        pygame.draw.rect(img, (160, 40, 40), (cx - 5, 4, 10, 5), border_radius=2)
+        # Outline
+        pygame.draw.polygon(img, (160, 145, 120), fang_pts, 1)
+        self.item_icons["cat_fang"] = img
+
+        # --- Guard Badge: shield badge with star (dark blue, silver, gold) ---
+        img = pygame.Surface((icon_size, icon_size), pygame.SRCALPHA)
+        # Shield outline: hexagonal badge shape
+        badge_pts = [(cx, 3), (cx + 13, 8), (cx + 14, 22),
+                     (cx, 36), (cx - 14, 22), (cx - 13, 8)]
+        pygame.draw.polygon(img, (25, 45, 120), badge_pts)    # dark blue fill
+        pygame.draw.polygon(img, (200, 210, 230), badge_pts, 2)  # silver border
+        # Gold upper bar
+        pygame.draw.rect(img, (200, 170, 40), (cx - 10, 9, 20, 5))
+        # White 5-pointed star in lower half
+        star_cx, star_cy = cx, cx + 8
+        star_outer, star_inner = 9, 4
+        star_pts = []
+        for _si in range(10):
+            _sr = star_outer if _si % 2 == 0 else star_inner
+            _sa = math.radians(_si * 36 - 90)
+            star_pts.append((star_cx + int(_sr * math.cos(_sa)),
+                             star_cy + int(_sr * math.sin(_sa))))
+        pygame.draw.polygon(img, (240, 240, 255), star_pts)
+        # Gold outer border ring
+        pygame.draw.polygon(img, (220, 190, 60), badge_pts, 1)
+        self.item_icons["guard_badge"] = img
+
+        # --- Commander Insignia: gold eagle wings + sunburst on navy ---
+        img = pygame.Surface((icon_size, icon_size), pygame.SRCALPHA)
+        # Dark navy background circle
+        pygame.draw.circle(img, (15, 20, 60), (cx, cx), 18)
+        pygame.draw.circle(img, (80, 90, 140), (cx, cx), 18, 1)
+        # Left wing polygon
+        pygame.draw.polygon(img, (200, 165, 30), [
+            (cx, cx + 2), (cx - 3, cx - 2), (cx - 8, cx - 6),
+            (cx - 14, cx - 2), (cx - 10, cx + 4), (cx - 5, cx + 2)])
+        # Right wing polygon (mirror)
+        pygame.draw.polygon(img, (200, 165, 30), [
+            (cx, cx + 2), (cx + 3, cx - 2), (cx + 8, cx - 6),
+            (cx + 14, cx - 2), (cx + 10, cx + 4), (cx + 5, cx + 2)])
+        # Center circle body
+        pygame.draw.circle(img, (220, 185, 50), (cx, cx + 2), 4)
+        pygame.draw.circle(img, (255, 230, 100), (cx, cx + 2), 2)
+        # Sunburst rays above
+        for _ri in range(5):
+            _ra = math.radians(-90 + (_ri - 2) * 22)
+            _rx1 = cx + int(5 * math.cos(_ra))
+            _ry1 = cx + int(5 * math.sin(_ra))
+            _rx2 = cx + int(13 * math.cos(_ra))
+            _ry2 = cx + int(13 * math.sin(_ra))
+            pygame.draw.line(img, (230, 200, 60), (_rx1, _ry1), (_rx2, _ry2), 2)
+        self.item_icons["commander_insignia"] = img
+
+        # --- Crystal: glowing icy gem with facets and glow halo ---
+        img = pygame.Surface((icon_size, icon_size), pygame.SRCALPHA)
+        # Outer glow halos (concentric circles with decreasing alpha)
+        for _gr, _ga in [(17, 35), (14, 60), (12, 90)]:
+            _gs = pygame.Surface((icon_size, icon_size), pygame.SRCALPHA)
+            pygame.draw.circle(_gs, (100, 200, 255, _ga), (cx, cx), _gr)
+            img.blit(_gs, (0, 0))
+        # Main crystal body: tall 6-sided gem shape
+        crystal_pts = [(cx, 2), (cx + 9, 10), (cx + 10, 24),
+                       (cx, 37), (cx - 10, 24), (cx - 9, 10)]
+        pygame.draw.polygon(img, (60, 160, 220), crystal_pts)
+        # Left facet (lighter)
+        pygame.draw.polygon(img, (100, 200, 245), [
+            (cx, 2), (cx - 9, 10), (cx - 10, 24), (cx, 18)])
+        # Top facet (white highlight)
+        pygame.draw.polygon(img, (200, 235, 255), [
+            (cx, 2), (cx + 9, 10), (cx, 14), (cx - 9, 10)])
+        # Bright inner sparkle
+        pygame.draw.line(img, (255, 255, 255), (cx - 3, cx - 4), (cx + 3, cx - 8), 1)
+        pygame.draw.line(img, (255, 255, 255), (cx, cx - 10), (cx, cx - 6), 1)
+        # Outline
+        pygame.draw.polygon(img, (40, 120, 180), crystal_pts, 1)
+        self.item_icons["crystal"] = img
 
         # --- Armor icons (shield shapes) ---
         # Leather armor: brown shield
@@ -2395,7 +2498,32 @@ class Game:
             if self.active_shop:
                 self.active_shop.update(dt, pygame.mouse.get_pos(),
                                         self.player, self.audio)
+                # Controller hold-A to sell (mirrors mouse hold-to-sell behavior)
+                if (self.controller_connected and self.joystick
+                        and self.active_shop.gamepad_panel == "inv"):
+                    a_held = self.joystick.get_button(CONTROLLER_BUTTON_ATTACK)
+                    if a_held:
+                        self._shop_ctrl_hold_timer += dt
+                        threshold = (self._shop_ctrl_hold_interval
+                                     if self._shop_ctrl_hold_triggered
+                                     else self._shop_ctrl_hold_initial)
+                        if self._shop_ctrl_hold_timer >= threshold:
+                            self._shop_ctrl_hold_timer = 0.0
+                            self._shop_ctrl_hold_triggered = True
+                            self.active_shop.gamepad_confirm(self.player, self.audio)
+                    else:
+                        self._shop_ctrl_hold_timer = 0.0
+                        self._shop_ctrl_hold_triggered = False
+                else:
+                    # Reset when not on inv panel or no controller
+                    self._shop_ctrl_hold_timer = 0.0
+                    self._shop_ctrl_hold_triggered = False
             self.hud.update(dt)
+        elif self.state == self.STATE_DYING:
+            # Advance the death animation timer; transition to game-over when done
+            self._dying_timer += dt
+            if self._dying_timer >= self._dying_duration:
+                self.state = self.STATE_GAME_OVER
 
     def _update_playing(self, dt: float):
         """Update gameplay state."""
@@ -2509,7 +2637,9 @@ class Game:
                 self._trigger_resurrection(res_ab)
                 if self.player.is_alive:
                     return  # resurrection succeeded, continue playing
-            self.state = self.STATE_GAME_OVER
+            # Transition to death animation state instead of immediately showing game over
+            self._dying_timer = 0.0
+            self.state = self.STATE_DYING
             self.audio.play_sfx("gameover")
             self.audio.stop_music()
             return
@@ -2606,6 +2736,8 @@ class Game:
         elif self.state == self.STATE_GAME_OVER:
             self._draw_game()
             self._draw_game_over()
+        elif self.state == self.STATE_DYING:
+            self._draw_dying()
         elif self.state == self.STATE_WIN:
             self._draw_game()
             self._draw_win()
@@ -4532,6 +4664,44 @@ class Game:
                 "ESC: resume  |  UP/DOWN: navigate  |  ENTER: confirm  |  "
                 "LEFT/RIGHT: adjust volume", True, GRAY)
         self.screen.blit(hint, (cx - hint.get_width() // 2, sh - hint.get_height() - int(16 * scale)))
+
+    def _draw_dying(self):
+        """Draw the world + a procedural death animation for the player.
+
+        The player sprite spins, turns red, and fades out over ``_dying_duration``
+        seconds before the game-over screen appears.
+        """
+        import math as _math
+        t = min(1.0, self._dying_timer / max(0.001, self._dying_duration))
+
+        # Draw the world normally (background, objects, NPCs, monsters)
+        self._draw_game()
+
+        # Determine player screen position from camera
+        if self.player and self.camera:
+            cam_x, cam_y = self.camera.offset
+            px = int(self.player.world_x - cam_x)
+            py = int(self.player.world_y - cam_y)
+
+            # Start from the current player sprite image (convert to SRCALPHA)
+            base_img = self.player.image.copy().convert_alpha()
+            w, h = base_img.get_size()
+
+            # Red tint using per-pixel alpha blend on a copy
+            red_overlay = pygame.Surface((w, h), pygame.SRCALPHA)
+            red_overlay.fill((210, 20, 20, int(190 * t)))
+            base_img.blit(red_overlay, (0, 0))
+
+            # Fade out: overall alpha goes 255 → 0
+            fade_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+            fade_surf.fill((0, 0, 0, int(255 * t)))
+            base_img.blit(fade_surf, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
+
+            # Spin: rotate up to 180 degrees clockwise
+            angle = -t * 180
+            rotated = pygame.transform.rotate(base_img, angle)
+            rot_rect = rotated.get_rect(center=(px, py))
+            self.screen.blit(rotated, rot_rect)
 
     def _draw_game_over(self):
         sw, sh = SCREEN_WIDTH, SCREEN_HEIGHT

@@ -217,6 +217,7 @@ class Monster(pygame.sprite.Sprite):
             if pdx * pdx + pdy * pdy < PROXIMITY_AGGRO_RANGE * PROXIMITY_AGGRO_RANGE:
                 self.is_enraged = True
                 self._just_enraged = True
+                self._path_recompute_timer = 0.0  # immediate path on first enrage
 
         if self.is_enraged and not self.is_boss and player_pos:
             self._do_enraged_chase(dt, player_pos, obstacles or [], entities or [])
@@ -286,28 +287,48 @@ class Monster(pygame.sprite.Sprite):
             self._try_move(nx, ny, obstacles, entities)
 
     def _do_enraged_chase(self, dt, player_pos, obstacles, entities):
-        """Chase the player at full speed, routing around obstacles when stuck."""
+        """Chase the player proactively using A* paths with LOS shortcut.
+
+        Proactive approach: a path is always maintained and refreshed every
+        1.5 s rather than only after the monster gets completely stuck.
+        LOS check: if there is a clear line-of-sight to the player the
+        monster shortcuts directly, giving natural movement in open areas.
+        """
+        from src.pathfind import build_walkable_grid, astar, has_los
+
         dx = player_pos[0] - self.world_x
         dy = player_pos[1] - self.world_y
         dist = math.sqrt(dx * dx + dy * dy)
 
-        # Clear A* path once close enough for direct chase
-        if dist < TILE_SIZE * 2:
-            self.stuck_path = []
-            self.stuck_timer = 0.0
-
         self._path_recompute_timer = max(0.0, self._path_recompute_timer - dt)
 
-        # Trigger A* when stuck for more than 0.5 s and no current path
-        if (self.stuck_timer > 0.5 and not self.stuck_path
-                and self._path_recompute_timer <= 0):
+        # Proactively recompute path every 1.5 s (or immediately on first chase)
+        if self._path_recompute_timer <= 0 and dist > TILE_SIZE * 1.5:
             self._recompute_path(player_pos, obstacles)
-            self._path_recompute_timer = 2.0
+            self._path_recompute_timer = 1.5
 
-        old_x, old_y = self.world_x, self.world_y
+        # LOS shortcut: if direct line to player is clear, skip A* path
+        _los_clear = False
+        if obstacles and dist > TILE_SIZE * 0.5:
+            _grid_size = max(
+                50, max((obs.right // TILE_SIZE for obs in obstacles), default=50) + 2)
+            _grid_size = min(_grid_size, 120)
+            _los_grid = build_walkable_grid(obstacles, _grid_size, _grid_size, TILE_SIZE)
+            mx = max(0, min(_grid_size - 1, int(self.world_x / TILE_SIZE)))
+            my = max(0, min(_grid_size - 1, int(self.world_y / TILE_SIZE)))
+            px = max(0, min(_grid_size - 1, int(player_pos[0] / TILE_SIZE)))
+            py = max(0, min(_grid_size - 1, int(player_pos[1] / TILE_SIZE)))
+            _los_clear = has_los(_los_grid, (mx, my), (px, py))
 
-        if self.stuck_path:
-            # Follow A* waypoints
+        if _los_clear or dist <= TILE_SIZE * 1.5:
+            # Direct chase — clear LOS or very close
+            if dist > TILE_SIZE * 0.5:
+                nx = dx / dist * self.speed * dt
+                ny = dy / dist * self.speed * dt
+                self._try_move(nx, ny, obstacles, entities)
+            self.stuck_path = []   # discard stale path when LOS is clear
+        elif self.stuck_path:
+            # Follow A* waypoints toward player
             wp = self.stuck_path[self.stuck_path_idx]
             wdx = wp[0] - self.world_x
             wdy = wp[1] - self.world_y
@@ -316,24 +337,20 @@ class Monster(pygame.sprite.Sprite):
                 self.stuck_path_idx += 1
                 if self.stuck_path_idx >= len(self.stuck_path):
                     self.stuck_path = []
-                    self.stuck_timer = 0.0
             elif wdist > 0:
                 nx = wdx / wdist * self.speed * dt
                 ny = wdy / wdist * self.speed * dt
                 self._try_move(nx, ny, obstacles, entities)
         elif dist > TILE_SIZE * 0.5:
-            # Direct chase
+            # Fallback direct move while path is being computed
             nx = dx / dist * self.speed * dt
             ny = dy / dist * self.speed * dt
             self._try_move(nx, ny, obstacles, entities)
 
-        # Update stuck timer
-        if self.world_x == old_x and self.world_y == old_y and dist > TILE_SIZE:
-            self.stuck_timer += dt
-        else:
-            self.stuck_timer = max(0.0, self.stuck_timer - dt * 2)
-
     def _do_boss_ai(self, dt, player_pos, obstacles, entities):
+        """Boss AI with proactive A* pathfinding and LOS shortcut (mirrors enraged logic)."""
+        from src.pathfind import build_walkable_grid, has_los
+
         dx = player_pos[0] - self.world_x
         dy = player_pos[1] - self.world_y
         dist = math.sqrt(dx * dx + dy * dy)
@@ -343,30 +360,43 @@ class Monster(pygame.sprite.Sprite):
         if dist < chase_range and not self.is_chasing:
             self.is_chasing = True
             self.chase_timer = BOSS_CHASE_DURATION
+            self._path_recompute_timer = 0.0  # immediate path on chase start
 
         if self.is_chasing:
             self.chase_timer -= dt
             if self.chase_timer <= 0 or dist > chase_range * 2:
                 self.is_chasing = False
                 self.stuck_path = []
-                self.stuck_timer = 0.0
+                self._path_recompute_timer = 0.0
                 return
 
-            # Move toward player (with stuck/pathfinding logic)
+            # Move toward player using proactive pathfinding
             if dist > TILE_SIZE * 0.8:
-                if dist < TILE_SIZE * 2:
-                    self.stuck_path = []
-                    self.stuck_timer = 0.0
-
                 self._path_recompute_timer = max(0.0, self._path_recompute_timer - dt)
-                if (self.stuck_timer > 0.5 and not self.stuck_path
-                        and self._path_recompute_timer <= 0):
+                if self._path_recompute_timer <= 0 and dist > TILE_SIZE * 1.5:
                     self._recompute_path(player_pos, obstacles)
-                    self._path_recompute_timer = 2.0
+                    self._path_recompute_timer = 1.5
 
-                old_x, old_y = self.world_x, self.world_y
+                # LOS shortcut
+                _los_clear = False
+                if obstacles:
+                    _grid_size = max(
+                        50, max((obs.right // TILE_SIZE for obs in obstacles), default=50) + 2)
+                    _grid_size = min(_grid_size, 120)
+                    _los_grid = build_walkable_grid(
+                        obstacles, _grid_size, _grid_size, TILE_SIZE)
+                    mx = max(0, min(_grid_size - 1, int(self.world_x / TILE_SIZE)))
+                    my = max(0, min(_grid_size - 1, int(self.world_y / TILE_SIZE)))
+                    px = max(0, min(_grid_size - 1, int(player_pos[0] / TILE_SIZE)))
+                    py = max(0, min(_grid_size - 1, int(player_pos[1] / TILE_SIZE)))
+                    _los_clear = has_los(_los_grid, (mx, my), (px, py))
 
-                if self.stuck_path:
+                if _los_clear or dist <= TILE_SIZE * 1.5:
+                    self.stuck_path = []
+                    nx = dx / dist * BOSS_CHASE_SPEED * dt
+                    ny = dy / dist * BOSS_CHASE_SPEED * dt
+                    self._try_move(nx, ny, obstacles, entities)
+                elif self.stuck_path:
                     wp = self.stuck_path[self.stuck_path_idx]
                     wdx = wp[0] - self.world_x
                     wdy = wp[1] - self.world_y
@@ -375,7 +405,6 @@ class Monster(pygame.sprite.Sprite):
                         self.stuck_path_idx += 1
                         if self.stuck_path_idx >= len(self.stuck_path):
                             self.stuck_path = []
-                            self.stuck_timer = 0.0
                     elif wdist > 0:
                         nx = wdx / wdist * BOSS_CHASE_SPEED * dt
                         ny = wdy / wdist * BOSS_CHASE_SPEED * dt
@@ -384,11 +413,6 @@ class Monster(pygame.sprite.Sprite):
                     nx = dx / dist * BOSS_CHASE_SPEED * dt
                     ny = dy / dist * BOSS_CHASE_SPEED * dt
                     self._try_move(nx, ny, obstacles, entities)
-
-                if self.world_x == old_x and self.world_y == old_y and dist > TILE_SIZE:
-                    self.stuck_timer += dt
-                else:
-                    self.stuck_timer = max(0.0, self.stuck_timer - dt * 2)
 
     def _try_move(self, dx: float, dy: float, obstacles: list, entities: list):
         """Try to move by (dx, dy) with collision checking."""
@@ -423,12 +447,21 @@ class Monster(pygame.sprite.Sprite):
             self._update_collision_rect()
 
     def _recompute_path(self, player_pos: tuple, obstacles: list):
-        """Compute an A* path around obstacles toward the player."""
+        """Compute an A* path around obstacles toward the player.
+
+        Grid size is derived from the actual obstacle extents so the path is
+        accurate in both 50-tile combat stages and large town stages (up to ~80
+        tiles). Capped at 120 tiles to bound computation cost.
+        """
         from src.pathfind import build_walkable_grid, astar
 
-        # Use a 50×50 tile grid (combat stage size).  Town stages are larger
-        # but the same grid works — excess tiles are simply marked walkable.
-        grid_size = 50
+        if obstacles:
+            grid_size = max(
+                50, max((obs.right // TILE_SIZE for obs in obstacles), default=50) + 2)
+        else:
+            grid_size = 50
+        grid_size = min(grid_size, 120)
+
         grid = build_walkable_grid(obstacles, grid_size, grid_size, TILE_SIZE)
 
         mx = max(0, min(grid_size - 1, int(self.world_x / TILE_SIZE)))
@@ -526,11 +559,13 @@ class Monster(pygame.sprite.Sprite):
         if not self.is_boss:
             if not self.is_enraged:
                 self._just_enraged = True
+                self._path_recompute_timer = 0.0  # immediate path on first enrage
             self.is_enraged = True
         # Boss: start/extend chase timer as before
         if self.is_boss and not self.is_chasing:
             self.is_chasing = True
             self.chase_timer = BOSS_CHASE_DURATION
+            self._path_recompute_timer = 0.0  # immediate path on boss chase start
         return False
 
     def can_deal_contact_damage(self) -> bool:
