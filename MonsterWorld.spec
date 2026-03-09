@@ -3,7 +3,9 @@
 #
 # Build command (from the project root with venv active):
 #   pip install pyinstaller
-#   pyinstaller MonsterWorld.spec
+#   pyinstaller -y MonsterWorld.spec
+#
+# The -y flag overwrites the existing dist/MonsterWorld/ folder automatically.
 #
 # Output: dist/MonsterWorld/  — copy this folder to distribute the game.
 # The end-user needs no Python installation.

@@ -4679,7 +4679,7 @@ class Game:
 
         # Determine player screen position from camera
         if self.player and self.camera:
-            cam_x, cam_y = self.camera.offset
+            cam_x, cam_y = self.camera.x, self.camera.y
             px = int(self.player.world_x - cam_x)
             py = int(self.player.world_y - cam_y)
 

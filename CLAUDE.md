@@ -887,6 +887,7 @@ When the player's HP reaches 0 (and no resurrection ability fires), the game ent
 - `game._dying_duration = 1.5`: duration of the animation
 - All player input is blocked during `STATE_DYING` (the state has no input handlers)
 - Music auto-continue is suppressed in `STATE_DYING` (same as `STATE_GAME_OVER`)
+- Camera offset is read as `camera.x, camera.y` (not `camera.offset` — the Camera class exposes `x`/`y` attributes directly)
 
 ### Hit Points
 - **Player:** Starts with base HP, gains more per level
