@@ -343,13 +343,17 @@ class Player(pygame.sprite.Sprite):
 
             nearby_obstacles = get_obstacle_rects_near(obstacles, old_rect)
 
-            # Also check entity collision
+            # Also check entity collision.
+            # Skip entities whose rect already overlaps the player's current position:
+            # if they are already on top of the player the player would be permanently
+            # blocked by them (stuck), so we only treat non-overlapping entities as
+            # movement blockers.  Damage is still applied by the combat system.
             entity_rects = []
             for e in entities:
                 if e is self:
                     continue
                 er = getattr(e, 'collision_rect', getattr(e, 'rect', None))
-                if er:
+                if er and not er.colliderect(old_rect):
                     entity_rects.append(er)
 
             all_blockers = nearby_obstacles + entity_rects

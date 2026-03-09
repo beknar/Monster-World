@@ -356,6 +356,7 @@ The Mage hero fires purple magic projectiles instead of swinging a melee weapon,
 - Entities cannot move through object-layer tiles (trees, houses, rocks, etc.)
 - Entities cannot move through each other (player, NPCs, monsters)
 - Use axis-aligned bounding box (AABB) collision detection
+- **Player-entity overlap escape:** `player.handle_input()` only adds an entity's rect to the movement-blocker list when it does **not** already overlap the player's current `collision_rect`. If a monster is already on top of the player (contact-damage overlap state), it is skipped as a blocker so the player can always move away. Damage is still applied by `combat.process_monster_contact()` regardless.
 - Object collision rects are shrunk by 20% per side (`inflate_ip(-shrink*2, -shrink*2)` where `shrink = int(TILE_SIZE * 0.2)`) so they better match the visible sprite size rather than covering the full tile
 - **Monster collision rects:** 85% of sprite width and 70% of sprite height (was 70%/50%), centered on the sprite. This makes melee and ranged attacks connect more reliably when they visually appear to hit. `src/monster.py` `__init__()`: `self.collision_rect = pygame.Rect(0, 0, int(w * 0.85), int(h * 0.70))`.
 - **Projectile collision rects:** 16×16 pixels (was 8×8), centered on the projectile position. `src/projectile.py`: `self.collision_rect = pygame.Rect(0, 0, 16, 16)`.
