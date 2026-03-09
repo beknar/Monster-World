@@ -1,4 +1,5 @@
 import os
+import sys
 import pygame
 
 # Display
@@ -78,7 +79,48 @@ PATH_COLORS = {
 # ---------------------------------------------------------------------------
 # Asset paths — ALL under newassets/
 # ---------------------------------------------------------------------------
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def _base_path() -> str:
+    """Return the root directory for bundled assets and data.
+
+    When running as a PyInstaller bundle, sys._MEIPASS is the temporary
+    directory where the bundle was extracted — that is where newassets/ and
+    data/ live.  In normal development, walk two levels up from this file
+    (src/settings.py → src/ → project root).
+    """
+    if getattr(sys, 'frozen', False):
+        return sys._MEIPASS  # PyInstaller bundle
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _saves_path() -> str:
+    """Return a writable directory for save files.
+
+    The PyInstaller bundle directory is read-only, so saves cannot live
+    alongside the executable.  Instead, use a per-user location:
+
+        Windows : %APPDATA%\\MonsterWorld\\saves
+        macOS   : ~/Library/Application Support/MonsterWorld/saves
+        Linux   : ~/.local/share/MonsterWorld/saves
+
+    During development the traditional saves/ folder at the project root is
+    used so nothing changes for contributors.
+    """
+    if getattr(sys, 'frozen', False):
+        if sys.platform == 'win32':
+            base = os.environ.get('APPDATA', os.path.expanduser('~'))
+        elif sys.platform == 'darwin':
+            base = os.path.join(os.path.expanduser('~'),
+                                'Library', 'Application Support')
+        else:
+            base = os.path.join(os.path.expanduser('~'), '.local', 'share')
+        return os.path.join(base, 'MonsterWorld', 'saves')
+    # Development: saves/ at project root (same as before)
+    return os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), 'saves')
+
+
+BASE_DIR = _base_path()
 NEWASSETS_PATH = os.path.join(BASE_DIR, "newassets")
 
 # Characters (TimeFantasy individual frames)
@@ -96,7 +138,7 @@ MUSIC_PATH = os.path.join(NEWASSETS_PATH, "Fantasy RPG Complete OST",
 
 # Data
 DATA_PATH = os.path.join(BASE_DIR, "data")
-SAVES_PATH = os.path.join(BASE_DIR, "saves")
+SAVES_PATH = _saves_path()   # writable per-user location (see _saves_path())
 
 # Sprite directions (row order in sprite sheets)
 DIR_DOWN = 0

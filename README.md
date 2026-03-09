@@ -168,6 +168,49 @@ The game window opens at 1920×1200 by default. You can change the resolution at
 
 ---
 
+## Building a Distributable
+
+A standalone executable can be built with **PyInstaller** — the end user needs no Python installation.
+
+### 1. Install PyInstaller
+```bash
+source venv/Scripts/activate   # Windows Git Bash
+pip install pyinstaller
+```
+
+### 2. Build
+```bash
+pyinstaller MonsterWorld.spec
+```
+
+Output is written to `dist/MonsterWorld/`. Distribute that entire folder.
+
+### What the build includes
+| Included | Notes |
+|----------|-------|
+| `newassets/` | All sprites, tilesets, sounds, and music |
+| `data/` | Item, weapon, drop-table, and shop JSON files |
+| Python runtime | Embedded — no user install required |
+| pygame + SDL DLLs | Bundled automatically |
+
+### Save file location (distributed build)
+Save files are stored outside the bundle so they survive updates:
+
+| Platform | Location |
+|----------|----------|
+| Windows | `%APPDATA%\MonsterWorld\saves\` |
+| macOS | `~/Library/Application Support/MonsterWorld/saves/` |
+| Linux | `~/.local/share/MonsterWorld/saves/` |
+
+During development, saves continue to use the `saves/` folder at the project root.
+
+### Notes
+- Build must be run on the **target OS** — PyInstaller cannot cross-compile.
+- Bundle size will be approximately 300–600 MB depending on asset content.
+- To add a window icon, place an `.ico` file in the project root and uncomment the `icon=` line in `MonsterWorld.spec`.
+
+---
+
 ## Project Structure
 
 ```

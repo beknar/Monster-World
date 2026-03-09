@@ -7,10 +7,12 @@ Up to 10 save slots (save_0.json through save_9.json).
 import json
 import os
 from datetime import datetime
-from src.settings import BASE_DIR
+from src.settings import SAVES_PATH
 
-SAVES_DIR = os.path.join(BASE_DIR, "saves")
-AUTOSAVE_PATH = os.path.join(BASE_DIR, "saves", "autosave.json")
+# SAVES_PATH already resolves to the correct writable location for both
+# development (project_root/saves/) and PyInstaller bundles (%APPDATA%/…).
+SAVES_DIR = SAVES_PATH
+AUTOSAVE_PATH = os.path.join(SAVES_PATH, "autosave.json")
 MAX_SAVE_SLOTS = 10
 MAX_SAVE_NAME_LENGTH = 20
 

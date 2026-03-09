@@ -31,6 +31,7 @@ Always activate the venv before running or installing packages.
 claude-rpg/
 ├── CLAUDE.md
 ├── README.md                        # Public-facing project overview, install and run instructions
+├── MonsterWorld.spec                # PyInstaller build spec (run: pyinstaller MonsterWorld.spec)
 ├── main.py                          # Game entry point
 ├── venv/                            # Python virtual environment
 ├── src/                             # Game source code
@@ -1135,6 +1136,45 @@ All character and monster sprites are **sprite sheets** (multiple frames in a si
 - All asset paths in `src/settings.py` must point into `newassets/` — no other asset directories
 - Stage data stored externally (JSON) so stages can be edited without code changes
 - Keep game loop in `src/game.py`: handle input -> update -> draw -> clock tick
+
+## Distribution / PyInstaller Build
+
+The game can be packaged into a standalone distributable folder using PyInstaller. The end user needs no Python installation.
+
+### Build command
+```bash
+# From the project root with venv active
+pip install pyinstaller
+pyinstaller MonsterWorld.spec
+# Output: dist/MonsterWorld/  — distribute this entire folder
+```
+
+### `MonsterWorld.spec`
+The spec file (project root) controls the build:
+- **`datas`**: recursively bundles `newassets/` (sprites, tilesets, sounds, music) and `data/` (JSON game data) into the bundle
+- **`console=False`**: no terminal window (windowed game)
+- **`onedir` mode**: produces a folder rather than a single `.exe`; pygame games launch significantly faster this way since assets are not re-extracted on every run
+- **`hiddenimports`**: explicitly lists `pygame` sub-modules that PyInstaller may otherwise miss
+- **`excludes`**: strips unused stdlib modules (`tkinter`, `http`, etc.) to reduce bundle size
+
+### PyInstaller-aware path resolution (`src/settings.py`)
+`BASE_DIR` is computed by `_base_path()`:
+- **Frozen (bundle):** returns `sys._MEIPASS` — the temp directory where PyInstaller extracted the bundle, where `newassets/` and `data/` reside
+- **Development:** walks two levels up from `src/settings.py` to the project root (unchanged from before)
+
+All asset/data path constants (`NEWASSETS_PATH`, `DATA_PATH`, `CHARS_PATH`, `TILESETS_PATH`, `SOUNDS_PATH`, `MUSIC_PATH`, `MUSIC_TRACKS`, `SFX_PATHS`) derive from `BASE_DIR` and are automatically correct in both modes.
+
+### Writable save file location (`SAVES_PATH`)
+The bundle directory is read-only, so `SAVES_PATH` is computed by `_saves_path()` separately from `BASE_DIR`:
+
+| Mode | Location |
+|------|----------|
+| Frozen — Windows | `%APPDATA%\MonsterWorld\saves\` |
+| Frozen — macOS | `~/Library/Application Support/MonsterWorld/saves/` |
+| Frozen — Linux | `~/.local/share/MonsterWorld/saves/` |
+| Development | `<project_root>/saves/` (unchanged) |
+
+`src/savegame.py` imports `SAVES_PATH` directly from `settings` (not `BASE_DIR`) so the correct writable path is used in all modes. `ensure_saves_dir()` creates the directory on first run.
 
 ## Credits and Licensing
 
