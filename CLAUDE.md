@@ -146,6 +146,9 @@ Sound effects in WAV format, split into two subdirectories.
 - Magic: Fire, Fireball, Magic, Spirit
 - Player feedback: Alert, Bonus, Coin, Gold, PowerUp, Success
 - Misc: Jump, MiniImpact, Strange, Secret, GameOver, Fx, Voice
+- **Procedural WAVs** (generated at build time, not bundled with original assets):
+  - `Gunshot.wav` — 0.22 s, 44100 Hz mono; exponential-decay noise + 100 Hz thump + 800 Hz crackle. Used for the Flintlock Pistol player weapon (`"gunshot"` SFX key).
+  - `MonsterShoot.wav` — 0.18 s, 44100 Hz mono; rising-then-falling pitch sweep (100 Hz→800 Hz→200 Hz) blended with noise. Used for monster ranged bullet attacks (`"monster_shoot"` SFX key).
 
 **newassets/sounds/menu/**: Menu UI sound effects
 - Accept, Cancel, Menu navigation sounds
@@ -370,6 +373,7 @@ The Mage hero fires purple magic projectiles instead of swinging a melee weapon,
 - **Damage formula (player taking damage):** `actual = max(1, raw_damage - armor_defense - buff_defense)`. Armor defense comes from equipped armor (permanent), buff defense comes from Iron Mushroom consumable (temporary). Minimum 1 damage always gets through.
 - **Floating damage numbers:** When the player deals damage to a monster, a yellow floating number appears at the monster's position showing the damage dealt. When the player takes damage from a monster (contact or attack), a red floating number appears at the player's position showing actual damage taken. Numbers rise upward and fade out over 0.8 seconds. Implemented via `FloatingText` class in `game.py`.
 - **Monster proximity attacks:** Monsters have an `attack_interval` and `attack_range` (defined per type in `MONSTER_STATS` in `settings.py`). When a monster is within its attack range of the player, it performs a melee attack with a visual claw-slash arc. Each monster type has different attack timing (wild_cat: 2.0s, commander: 1.0s) and range (55–75 pixels). Monster attack cooldowns are staggered randomly at spawn to avoid simultaneous attacks.
+- **Monster attack sounds:** Monsters play sound effects when attacking. Melee swings play `"sword_swing2"` (set via `monster.pending_attack_sound` flag in `_start_attack()`, consumed by `game.py` after each monster update). Ranged shots use `"monster_shoot"` (a procedurally generated 0.18 s rising-then-falling pitch sweep WAV, `newassets/Sounds/Game/MonsterShoot.wav`) for bullet-style projectiles, or the existing `"magic"` SFX for homing/magic projectiles. The sound key is stored in `pending_ranged_shot["sound"]` and played in `game.py` when the projectile is spawned.
 - **Monster ranged attacks (stage 5+):** Bandit, soldier, guard, and commander monsters gain ranged projectile attacks when `difficulty >= 2.0` (≈ stage 5). Bosses of any type gain ranged attacks when `difficulty >= 2.5` (≈ stage 6). Parameters scale continuously from difficulty 2.0 → 4.0:
   - Range: 150 → 400 px (bosses ×1.3)
   - Projectile speed: 200 → 320 px/s (bosses ×1.2)
@@ -1059,14 +1063,24 @@ Rows 0–1 are sliders; rows 2–4 are button rows. ESC always resumes immediate
 - Stage progress (stage_num, stage_type)
 - Music rotation indices (combat_music_index, town_music_index)
 - **Multi-spell state:** selected_spell_idx, shield_hp, action_surge_timer, whirlwind_timer, blazing_sword_timer, double_fire_timer, last_town_num
+- **Player world position** (player_x, player_y) — restored exactly so the player resumes at the same map location
+- **Alive monsters** — each monster's type, behavior, is_boss, position, current HP, max HP, damage, difficulty, is_enraged, is_chasing, and patrol_points. Monsters that died before saving are not included.
+- **Alive chests** — each chest's position, current HP, max HP, locked state, and drop_table_key. Destroyed chests are not included.
+- **Boss defeated** flag — if the boss was already killed, chests unlock immediately on load.
 - Save metadata (name, timestamp, version)
 
 **What is NOT saved (regenerated on load):**
-- Stage layout (procedurally regenerated from stage_num + stage_type)
-- Player position (placed at stage start position)
+- Stage layout and obstacles (procedurally regenerated from stage_num + stage_type for consistent geometry)
 - Ground items, gold drops, projectiles, floating texts (cleared on stage load)
-- Monster positions and HP (regenerated)
 - Camera (recreated from stage dimensions)
+
+**Entity restore flow on load:**
+1. `_load_stage()` regenerates the stage map geometry and obstacles (deterministic from stage seed)
+2. Player is created at the stage start position, then `world_x`/`world_y` are overridden to the saved position
+3. `stage.monsters` sprite group is emptied and repopulated from the saved monsters list
+4. `stage.chests` list is cleared and rebuilt from saved chests data
+5. If `boss_defeated` is True, `stage.unlock_boss_chests()` is called immediately
+6. Implemented in `game._restore_entities_from_save(save_data)`, called from both `_execute_load()` and `_load_from_autosave()`
 
 **Save file JSON structure:**
 ```json
@@ -1086,7 +1100,19 @@ Rows 0–1 are sliders; rows 2–4 are button rows. ESC always resumes immediate
   "buffs": {},
   "inventory": [{"item_id": "potion_red", "quantity": 3}, null, ...],
   "stage_num": 3, "stage_type": "combat",
-  "combat_music_index": 2, "town_music_index": 1
+  "combat_music_index": 2, "town_music_index": 1,
+  "player_x": 384.0, "player_y": 1200.0,
+  "boss_defeated": false,
+  "monsters": [
+    {"monster_type": "bandit", "behavior": "stand", "is_boss": false,
+     "world_x": 800.0, "world_y": 600.0, "hp": 45, "max_hp": 60,
+     "damage": 12, "difficulty": 1.4, "is_enraged": true, "is_chasing": false,
+     "patrol_points": []}
+  ],
+  "chests": [
+    {"world_x": 1056.0, "world_y": 864.0, "hp": 30, "max_hp": 42,
+     "locked": false, "drop_table_key": "treasure_chest"}
+  ]
 }
 ```
 
@@ -1108,7 +1134,7 @@ Rows 0–1 are sliders; rows 2–4 are button rows. ESC always resumes immediate
 
 **Implementation files:**
 - `src/savegame.py`: `ensure_saves_dir()`, `list_saves()`, `save_game()`, `load_save()`, `delete_save()`, `save_autosave()`, `load_autosave()`, `has_autosave()`, `delete_autosave()`, constants `MAX_SAVE_SLOTS=10`, `MAX_SAVE_NAME_LENGTH=20`, `AUTOSAVE_PATH`
-- `src/game.py`: `_options_rows()`, `_activate_options_row()`, `_activate_pause_row()`, `_exit_to_menu()`, `_load_from_autosave()`, `_save_dialog_layout()`, `_draw_save_dialog()`, `_draw_load_dialog()`, `_draw_delete_dialog()`, `_handle_dialog_click()`, `_execute_save()`, `_execute_load()`, `_execute_delete()`, `_get_game_state_dict()`, `_start_save_name_input()`, `_dialog_cursor_next/prev_occupied()`
+- `src/game.py`: `_options_rows()`, `_activate_options_row()`, `_activate_pause_row()`, `_exit_to_menu()`, `_load_from_autosave()`, `_save_dialog_layout()`, `_draw_save_dialog()`, `_draw_load_dialog()`, `_draw_delete_dialog()`, `_handle_dialog_click()`, `_execute_save()`, `_execute_load()`, `_execute_delete()`, `_get_game_state_dict()`, `_restore_entities_from_save()`, `_start_save_name_input()`, `_dialog_cursor_next/prev_occupied()`
 - `src/settings.py`: `SAVES_PATH` constant
 - Dialog tracking attributes: `save_slots_cache`, `dialog_cursor`, `save_name_input`, `save_name_editing`, `delete_confirm`, `dialog_return_state`, `has_autosave`
 - `TEXTINPUT` event handler in `handle_events()` for save name text input

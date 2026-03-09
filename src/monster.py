@@ -63,6 +63,7 @@ class Monster(pygame.sprite.Sprite):
         self.is_attacking = False
         self.attack_anim_timer = 0.0
         self.attack_hit_pending = False  # Flag for combat system to process damage
+        self.pending_attack_sound = None  # Sound key for game.py to play on melee swing
 
         # State
         self.is_alive = True
@@ -314,6 +315,7 @@ class Monster(pygame.sprite.Sprite):
                         "damage": self.ranged_attack_damage,
                         "max_range": self.ranged_attack_range,
                         "homing": self.ranged_homing,
+                        "sound": "magic" if self.ranged_homing else "monster_shoot",
                     }
                     self.ranged_attack_cooldown = self.ranged_attack_interval
 
@@ -340,7 +342,8 @@ class Monster(pygame.sprite.Sprite):
         self.is_attacking = True
         self.attack_anim_timer = MONSTER_ATTACK_DURATION
         self.attack_cooldown = self.attack_interval
-        self.attack_hit_pending = True  # Combat system will pick this up
+        self.attack_hit_pending = True    # Combat system will pick this up
+        self.pending_attack_sound = "sword_swing2"  # game.py plays this each swing
 
     def _do_patrol(self, dt, obstacles, entities):
         if not self.patrol_points:

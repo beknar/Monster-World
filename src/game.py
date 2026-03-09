@@ -2595,8 +2595,14 @@ class Game:
                         other.is_enraged = True
                         other._just_enraged = True
 
-        # Spawn enemy ranged projectiles from monsters that fired this frame
+        # Play monster melee attack sounds and spawn ranged projectiles
         for monster in self.stage.monsters:
+            # Melee swing sound
+            if monster.pending_attack_sound:
+                self.audio.play_sfx(monster.pending_attack_sound)
+                monster.pending_attack_sound = None
+
+            # Ranged projectile shot
             shot = monster.pending_ranged_shot
             if shot:
                 style = "magic" if monster.ranged_homing else "bullet"
@@ -2604,9 +2610,10 @@ class Game:
                     shot["x"], shot["y"], shot["dir"],
                     shot["speed"], shot["damage"], shot["max_range"],
                     style=style, homing=False)
-                # Mark as enemy projectile so we can tint it red
                 ep._is_enemy = True
                 self.enemy_projectiles.append(ep)
+                snd = shot.get("sound", "monster_shoot")
+                self.audio.play_sfx(snd)
 
         # NPCs
         self.hud.near_merchant = False
@@ -3867,6 +3874,9 @@ class Game:
         self.player.double_fire_timer = save_data.get("double_fire_timer", 0.0)
         self.last_town_num = save_data.get("last_town_num", 0)
 
+        # Restore entity state (player position, monsters, chests, boss)
+        self._restore_entities_from_save(save_data)
+
         # Camera and state
         self.camera = Camera(self.stage.width, self.stage.height)
         self.state = self.STATE_PLAYING
@@ -3931,6 +3941,44 @@ class Game:
         if self.player.equipped_armor:
             armor_id = self.player.equipped_armor.get("id", "")
 
+        # Serialize alive monsters
+        monsters_data = []
+        if hasattr(self, 'stage') and self.stage:
+            for m in self.stage.monsters:
+                if m.is_alive:
+                    monsters_data.append({
+                        "monster_type": m.monster_type,
+                        "behavior": m.behavior,
+                        "is_boss": m.is_boss,
+                        "world_x": m.world_x,
+                        "world_y": m.world_y,
+                        "hp": m.hp,
+                        "max_hp": m.max_hp,
+                        "damage": m.damage,
+                        "difficulty": m.difficulty,
+                        "is_enraged": m.is_enraged,
+                        "is_chasing": m.is_chasing,
+                        "patrol_points": m.patrol_points,
+                    })
+
+        # Serialize alive chests
+        chests_data = []
+        if hasattr(self, 'stage') and self.stage:
+            for c in self.stage.chests:
+                if c.is_alive:
+                    chests_data.append({
+                        "world_x": c.world_x,
+                        "world_y": c.world_y,
+                        "hp": c.hp,
+                        "max_hp": c.max_hp,
+                        "locked": c.locked,
+                        "drop_table_key": c.drop_table_key,
+                    })
+
+        boss_defeated = False
+        if hasattr(self, 'stage') and self.stage:
+            boss_defeated = getattr(self.stage, 'boss_defeated', False)
+
         return {
             "hero_id": self.player.hero_id,
             "hero_name": self.player.character,
@@ -3959,7 +4007,81 @@ class Game:
             "blazing_sword_timer": getattr(self.player, 'blazing_sword_timer', 0.0),
             "double_fire_timer": getattr(self.player, 'double_fire_timer', 0.0),
             "last_town_num": getattr(self, 'last_town_num', 0),
+            # Entity state
+            "player_x": self.player.world_x,
+            "player_y": self.player.world_y,
+            "monsters": monsters_data,
+            "chests": chests_data,
+            "boss_defeated": boss_defeated,
         }
+
+    def _restore_entities_from_save(self, save_data: dict):
+        """Restore monsters, chests, player position, and boss state from save_data.
+
+        Must be called after _load_stage() and player creation so stage and
+        player objects already exist.
+        """
+        from src.monster import Monster
+        from src.stage import TreasureChest
+
+        # Restore player world position
+        from src.settings import TILE_SIZE
+        player_x = save_data.get("player_x")
+        player_y = save_data.get("player_y")
+        if player_x is not None and player_y is not None:
+            self.player.world_x = float(player_x)
+            self.player.world_y = float(player_y)
+            # Sync rects to saved position (mirrors player.__init__ positioning)
+            self.player.rect.center = (int(self.player.world_x),
+                                       int(self.player.world_y))
+            self.player.collision_rect.midbottom = (
+                int(self.player.world_x),
+                int(self.player.world_y) + TILE_SIZE // 3
+            )
+
+        # Restore monsters (replace procedurally generated ones)
+        monsters_data = save_data.get("monsters")
+        if monsters_data is not None:
+            self.stage.monsters.empty()
+            for md in monsters_data:
+                mtype = md.get("monster_type", "wild_cat")
+                behavior = md.get("behavior", "stand")
+                is_boss = md.get("is_boss", False)
+                mx = md.get("world_x", 0.0)
+                my = md.get("world_y", 0.0)
+                difficulty = md.get("difficulty", 1.0)
+                patrol_pts = md.get("patrol_points", [])
+                m = Monster(mx, my, mtype, behavior=behavior,
+                            is_boss=is_boss, patrol_points=patrol_pts,
+                            difficulty=difficulty)
+                # Override HP/damage with saved values (may differ from fresh spawn)
+                m.hp = md.get("hp", m.hp)
+                m.max_hp = md.get("max_hp", m.max_hp)
+                m.damage = md.get("damage", m.damage)
+                m.is_enraged = md.get("is_enraged", False)
+                m.is_chasing = md.get("is_chasing", False)
+                self.stage.monsters.add(m)
+
+        # Restore chests (replace procedurally generated ones)
+        chests_data = save_data.get("chests")
+        if chests_data is not None:
+            self.stage.chests = []
+            for cd in chests_data:
+                cx = cd.get("world_x", 0.0)
+                cy = cd.get("world_y", 0.0)
+                locked = cd.get("locked", False)
+                c = TreasureChest(int(cx), int(cy), locked=locked)
+                c.hp = cd.get("hp", c.hp)
+                c.max_hp = cd.get("max_hp", c.max_hp)
+                c.drop_table_key = cd.get("drop_table_key", c.drop_table_key)
+                self.stage.chests.append(c)
+
+        # Restore boss defeated flag
+        if hasattr(self.stage, 'boss_defeated'):
+            self.stage.boss_defeated = save_data.get("boss_defeated", False)
+            # Unlock chests if boss was already defeated when saved
+            if self.stage.boss_defeated:
+                self.stage.unlock_boss_chests()
 
     def _execute_save(self):
         """Save the game to the selected slot."""
@@ -4059,6 +4181,9 @@ class Game:
         self.player.blazing_sword_timer = save_data.get("blazing_sword_timer", 0.0)
         self.player.double_fire_timer = save_data.get("double_fire_timer", 0.0)
         self.last_town_num = save_data.get("last_town_num", 0)
+
+        # Restore entity state (player position, monsters, chests, boss)
+        self._restore_entities_from_save(save_data)
 
         # Set up camera and start playing
         self.camera = Camera(self.stage.width, self.stage.height)
