@@ -206,7 +206,7 @@ During development, saves continue to use the `saves/` folder at the project roo
 
 ### Notes
 - Build must be run on the **target OS** — PyInstaller cannot cross-compile.
-- Bundle size will be approximately 300–600 MB depending on asset content.
+- Bundle size is approximately **1.4 GB** (dominated by the full Fantasy RPG Complete OST).
 - To add a window icon, place an `.ico` file in the project root and uncomment the `icon=` line in `MonsterWorld.spec`.
 
 ---

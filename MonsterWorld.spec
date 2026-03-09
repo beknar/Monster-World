@@ -34,6 +34,7 @@ a = Analysis(
     datas=added_files,
     hiddenimports=[
         # pygame occasionally needs these sub-modules explicitly imported
+        # (pygame._view was removed in pygame 2.x — do not add it back)
         'pygame',
         'pygame.mixer',
         'pygame.font',
@@ -41,7 +42,6 @@ a = Analysis(
         'pygame.transform',
         'pygame.draw',
         'pygame.joystick',
-        'pygame._view',
     ],
     hookspath=[],
     hooksconfig={},

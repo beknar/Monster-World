@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+
+# PyInstaller build output — do not commit (1+ GB)
+build/
+dist/
+*.spec.bak
+
+# Save files — user-specific, regenerated at runtime
+saves/
+
+# IDE / OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
