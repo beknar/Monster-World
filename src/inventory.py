@@ -240,9 +240,17 @@ class Inventory:
             if stack:
                 self._draw_tooltip(surface, stack, font)
 
-        # Draw held item at cursor
+        # Draw held item at cursor position (gamepad = cursor slot center; mouse = mouse pos)
         if self.held_item:
-            mx, my = pygame.mouse.get_pos()
+            if self.gamepad_cursor >= 0:
+                # Draw held item floating above the current gamepad cursor slot
+                row = self.gamepad_cursor // INVENTORY_COLS
+                col = self.gamepad_cursor % INVENTORY_COLS
+                cx = self.rect.x + padding + col * (slot_size + padding) + slot_size // 2
+                cy = self.rect.y + title_h + row * (slot_size + padding) + slot_size // 2
+                mx, my = cx, cy - slot_size  # float item above the slot
+            else:
+                mx, my = pygame.mouse.get_pos()
             icon = item_icons.get(self.held_item.item_data.icon_key)
             if icon:
                 surface.blit(icon, (mx - icon.get_width() // 2,
@@ -254,14 +262,20 @@ class Inventory:
         # Controller hints below inventory
         if self.gamepad_cursor >= 0:
             hint_font = pygame.font.Font(None, settings.scaled_font_size(18))
-            hint_text = "A:Use/Equip  Y:Drop  D-pad:Navigate  B/X:Close"
+            if self.held_item:
+                hint_text = "A:Place  Y:Drop to Ground  D-pad:Navigate  B/X:Cancel"
+            else:
+                hint_text = "A:Pick Up  Y:Use/Equip  D-pad:Navigate  B/X:Close"
             hint = hint_font.render(hint_text, True, GRAY)
             surface.blit(hint, (self.rect.centerx - hint.get_width() // 2,
                                 self.rect.bottom + 8))
 
     def _draw_tooltip(self, surface: pygame.Surface, stack: ItemStack, font: pygame.font.Font):
         if self.gamepad_cursor >= 0:
-            action_hint = "A: Use/Equip | Y: Drop"
+            if self.held_item:
+                action_hint = "A: Place here | Y: Drop to ground"
+            else:
+                action_hint = "A: Pick Up | Y: Use/Equip"
         else:
             action_hint = "Right-click: Use | Left-click: Pick up/Move"
         lines = [

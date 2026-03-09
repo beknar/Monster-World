@@ -96,6 +96,12 @@ class Monster(pygame.sprite.Sprite):
         self.stuck_path_idx: int = 0
         self._path_recompute_timer = 0.0  # cooldown before recomputing A* path
 
+        # Ranged attacks — enabled at stage 5+ (difficulty >= 2.0) for non-boss,
+        # stage 6+ (difficulty >= 2.5) for bosses.  Only bandit and above fire ranged shots.
+        # Scaling: range 150→400 px, speed 200→320 px/s, damage, interval 3.0→1.2 s.
+        # Homing enabled at difficulty >= 3.4 (stage 9+).
+        self._init_ranged_attack(difficulty, is_boss, monster_type)
+
         # Animation — load from individual frame files
         self.anim_set = self._load_animations()
         self.image = self.anim_set.update(0)
@@ -135,6 +141,57 @@ class Monster(pygame.sprite.Sprite):
                 pygame.draw.ellipse(placeholder, color, (2, 2, size - 4, size - 4))
                 anim_set.add(anim_name, direction, Animation([placeholder], ANIM_SPEED))
         return anim_set
+
+    def _init_ranged_attack(self, difficulty: float, is_boss: bool, monster_type: str):
+        """Configure ranged attack parameters based on difficulty scaling.
+
+        Non-boss ranged attacks: difficulty >= 2.0 (stage 5+), only bandit and above.
+        Boss ranged attacks   : difficulty >= 2.5 (stage 6+), any boss type.
+        Scaling range         : difficulty 2.0 → 4.0 interpolates all parameters.
+        Homing                : enabled at difficulty >= 3.4 (stage 9+).
+        """
+        # Ranged-capable monster types for regular monsters
+        RANGED_TYPES = {"bandit", "soldier", "guard", "commander"}
+
+        # Determine if ranged attacks are unlocked
+        if is_boss:
+            enabled = difficulty >= 2.5
+        else:
+            enabled = difficulty >= 2.0 and monster_type in RANGED_TYPES
+
+        self.ranged_attack_enabled = enabled
+        self.pending_ranged_shot = None  # dict set each frame game.py should spawn a projectile
+
+        if not enabled:
+            self.ranged_attack_range = 0.0
+            self.ranged_attack_speed = 0.0
+            self.ranged_attack_damage = 0
+            self.ranged_attack_interval = 999.0
+            self.ranged_attack_cooldown = 999.0
+            self.ranged_homing = False
+            return
+
+        # Normalise t ∈ [0, 1] across difficulty 2.0 → 4.0
+        t = max(0.0, min(1.0, (difficulty - 2.0) / 2.0))
+
+        base_range = 150.0 + t * 250.0        # 150 → 400 px
+        base_speed = 200.0 + t * 120.0        # 200 → 320 px/s
+        base_damage = int(6 + t * 20)         # 6  → 26 (scaled further for bosses below)
+        base_interval = 3.0 - t * 1.8         # 3.0 → 1.2 s
+
+        if is_boss:
+            base_range *= 1.3
+            base_speed *= 1.2
+            base_damage = int(base_damage * 1.5)
+            base_interval *= 0.8
+
+        self.ranged_attack_range = base_range
+        self.ranged_attack_speed = base_speed
+        self.ranged_attack_damage = base_damage
+        self.ranged_attack_interval = base_interval
+        # Stagger initial shot so groups don't all fire simultaneously
+        self.ranged_attack_cooldown = random.uniform(base_interval * 0.3, base_interval)
+        self.ranged_homing = difficulty >= 3.4
 
     def _update_collision_rect(self):
         self.collision_rect.midbottom = (int(self.world_x),
@@ -227,13 +284,38 @@ class Monster(pygame.sprite.Sprite):
             self._do_boss_ai(dt, player_pos, obstacles or [], entities or [])
         # "stand" behavior: just idle
 
-        # --- Proximity attack: ALL monsters attack player when nearby ---
+        # --- Proximity melee attack: ALL monsters attack player when nearby ---
         if player_pos and not self.is_attacking and self.attack_cooldown <= 0:
             dx = player_pos[0] - self.world_x
             dy = player_pos[1] - self.world_y
             dist = math.sqrt(dx * dx + dy * dy)
             if dist < self.attack_range:
                 self._start_attack(dx, dy)
+
+        # --- Ranged attack: fire at player when chasing and in range ---
+        self.pending_ranged_shot = None
+        if (self.ranged_attack_enabled and player_pos
+                and (self.is_enraged or (self.is_boss and self.is_chasing))
+                and not self.is_imprisoned and not self.is_darkened):
+            if self.ranged_attack_cooldown > 0:
+                self.ranged_attack_cooldown -= dt
+            else:
+                dx = player_pos[0] - self.world_x
+                dy = player_pos[1] - self.world_y
+                dist = math.sqrt(dx * dx + dy * dy)
+                # Only fire from outside melee range (avoid visual confusion)
+                if self.attack_range < dist <= self.ranged_attack_range:
+                    length = dist if dist > 0 else 1.0
+                    self.pending_ranged_shot = {
+                        "x": self.world_x,
+                        "y": self.world_y,
+                        "dir": (dx / length, dy / length),
+                        "speed": self.ranged_attack_speed,
+                        "damage": self.ranged_attack_damage,
+                        "max_range": self.ranged_attack_range,
+                        "homing": self.ranged_homing,
+                    }
+                    self.ranged_attack_cooldown = self.ranged_attack_interval
 
         # Update animation
         if self.is_attacking:

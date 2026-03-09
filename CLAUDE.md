@@ -247,10 +247,11 @@ The game auto-detects Xbox controllers via `pygame.joystick` on startup and supp
 
 **Controller inventory navigation:**
 - D-pad moves a gold-bordered cursor through the 5x5 inventory grid
-- A button uses/equips the highlighted item (same as right-click)
-- Y button drops the highlighted item on the ground
-- B, X, Back, or START closes inventory
-- Tooltip shows next to the cursor slot with controller-specific hints
+- **A button** — two-step drag-and-drop: first press picks up the item (floats above the slot); second press places it at the current cursor slot (swapping or stacking as needed)
+- **Y button** — when NOT holding an item: use/equip the highlighted item (same as right-click); when holding an item: drop the held item to the ground (cancel drag)
+- **B, X, Back, or START** — close inventory; any held item is returned to inventory (or dropped on the ground if inventory is full)
+- Tooltip shows next to the cursor slot with controller-specific hints (changes text when an item is held)
+- Held item drawn floating above the current cursor slot (not at mouse position)
 
 **Controller shop navigation:**
 - Shop opens with cursor on the shop panel (buy side)
@@ -368,6 +369,15 @@ The Mage hero fires purple magic projectiles instead of swinging a melee weapon,
 - **Damage formula (player taking damage):** `actual = max(1, raw_damage - armor_defense - buff_defense)`. Armor defense comes from equipped armor (permanent), buff defense comes from Iron Mushroom consumable (temporary). Minimum 1 damage always gets through.
 - **Floating damage numbers:** When the player deals damage to a monster, a yellow floating number appears at the monster's position showing the damage dealt. When the player takes damage from a monster (contact or attack), a red floating number appears at the player's position showing actual damage taken. Numbers rise upward and fade out over 0.8 seconds. Implemented via `FloatingText` class in `game.py`.
 - **Monster proximity attacks:** Monsters have an `attack_interval` and `attack_range` (defined per type in `MONSTER_STATS` in `settings.py`). When a monster is within its attack range of the player, it performs a melee attack with a visual claw-slash arc. Each monster type has different attack timing (wild_cat: 2.0s, commander: 1.0s) and range (55–75 pixels). Monster attack cooldowns are staggered randomly at spawn to avoid simultaneous attacks.
+- **Monster ranged attacks (stage 5+):** Bandit, soldier, guard, and commander monsters gain ranged projectile attacks when `difficulty >= 2.0` (≈ stage 5). Bosses of any type gain ranged attacks when `difficulty >= 2.5` (≈ stage 6). Parameters scale continuously from difficulty 2.0 → 4.0:
+  - Range: 150 → 400 px (bosses ×1.3)
+  - Projectile speed: 200 → 320 px/s (bosses ×1.2)
+  - Damage: 6 → 26 (bosses ×1.5)
+  - Fire interval: 3.0 → 1.2 s (bosses ×0.8)
+  - Homing projectiles: enabled at difficulty ≥ 3.4 (stage 9+)
+  - Monsters only fire from **outside melee range** (avoids visual confusion). Initial cooldowns are staggered per monster to prevent synchronised volleys.
+  - Implemented via `monster._init_ranged_attack()` in `src/monster.py` and `monster.pending_ranged_shot` dict consumed each frame by `game.py` which spawns `Projectile` objects into `self.enemy_projectiles`.
+  - Enemy projectiles use `style="bullet"` (stages 5–8) or `style="magic"` (homing, stage 9–10). Collision with player applies damage through `player.take_damage()` and spawns a red floating number.
 - Monsters can also damage the player on direct collision contact (fallback)
 - `combat.process_monster_contact()` returns a list of `(actual_damage, monster_x, monster_y)` tuples for spawning floating damage numbers. `player.take_damage()` returns `int` actual damage dealt (after armor reduction).
 - Player default weapon: basic sword (from `newassets/objects/Sword.png`)
@@ -584,7 +594,7 @@ Define in `data/weapons.json`. Each weapon has:
 - `style`: Weapon visual style — one of `"sword"`, `"axe"`, `"staff"`, `"legendary"`, `"bow"`, `"gun"` — determines the procedural weapon graphic, trail color, and inventory icon
 - `blade_color`: RGB color array for the weapon's blade/head (e.g., `[190, 200, 220]`)
 - `icon`: Icon pack reference (used in HUD)
-- `sound_swing`: Sound effect for swinging/firing
+- `sound_swing`: Sound effect for swinging/firing. The **Flintlock Pistol** uses `"gunshot"` — a procedurally generated WAV (`newassets/Sounds/Game/Gunshot.wav`, 0.22 s, 44100 Hz mono, exponential-decay noise + 100 Hz thump + 800 Hz crackle) synthesized by Python's `wave`/`struct`/`math`/`random` modules. Registered in `SFX_PATHS` as `"gunshot"`.
 - `sound_hit`: Sound effect on contact
 - `projectile_speed` (ranged only): Projectile travel speed in pixels/sec. A weapon is considered ranged if `projectile_speed > 0`.
 - `projectile_style` (ranged only): `"arrow"`, `"bullet"`, or `"magic"`
@@ -770,7 +780,7 @@ Armor provides permanent damage reduction. Defined in `ARMOR_DEFS` dict in `sett
   - Closing inventory while holding an item puts it back into inventory (or drops if inventory is full)
 - **Full inventory:** If inventory is full and player tries to pick up an item, show a "Inventory full" message on the HUD. Item remains on the ground.
 - **Inventory UI:** Rendered as a centered overlay with a semi-transparent background. Each slot shows the item icon and stack count (if > 1). Hovering a slot shows a tooltip with item name, type, and description. Held item follows the cursor.
-- **Controller inventory navigation:** D-pad moves a gold-bordered cursor through the grid (`inventory.gamepad_cursor`). A button uses/equips item. Y button drops item. B/X/Back/START closes inventory. Tooltip appears next to cursor slot with controller-specific hints. Cursor activates (index 0) when inventory is opened via controller and deactivates (-1) on close.
+- **Controller inventory navigation:** D-pad moves a gold-bordered cursor through the grid (`inventory.gamepad_cursor`). A = pick up / place (two-press drag-and-drop). Y = use/equip (when not holding) or drop held item to ground (when holding). B/X/Back/START closes inventory and returns held item. Cursor activates (index 0) when inventory is opened via controller and deactivates (-1) on close. Held item floats above the cursor slot position.
 - **Resolution scaling:** Inventory slot sizes and padding scale with resolution via `settings.scaled_slot_size()` and `settings.scaled_padding()`. Layout is recalculated on `toggle()` and `draw()`. Shop inventory panel also uses these scaled values.
 
 ### Loot and Pickups
@@ -1023,7 +1033,7 @@ Rows 0–1 are sliders; rows 2–4 are button rows. ESC always resumes immediate
 1. Player selects a slot (1-10) with UP/DOWN or D-pad
 2. Presses ENTER to open text input for naming (up to 20 chars)
 3. Types a name, presses ENTER to confirm or ESC to cancel
-4. On controller: A button auto-names ("Save {N}" or existing name) and saves immediately
+4. On controller: A button auto-names (existing name if the slot already has a save; otherwise generates `"{HeroName} Lv{level} Stg{stage}"` — e.g. "Warrior Lv5 Stg3", truncated to 20 chars) and saves immediately without needing a keyboard
 5. `_execute_save()` calls `save_game()` from `savegame.py`, then returns to `dialog_return_state`
 
 **Load dialog flow:**

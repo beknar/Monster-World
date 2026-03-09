@@ -171,7 +171,7 @@
     "blade_color": [80, 80, 90],
     "projectile_speed": 500,
     "projectile_style": "bullet",
-    "sound_swing": "sword_swing2",
+    "sound_swing": "gunshot",
     "sound_hit": "hit3",
     "classes": ["ranger"]
   },

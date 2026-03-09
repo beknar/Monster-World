@@ -257,7 +257,8 @@ class Game:
         self.stage = None
         self.ground_items = pygame.sprite.Group()
         self.gold_drops = pygame.sprite.Group()
-        self.projectiles = []  # Active projectiles (arrows, bullets)
+        self.projectiles = []       # Active player projectiles (arrows, bullets)
+        self.enemy_projectiles = [] # Active enemy ranged attack projectiles
         self.floating_texts = []  # Active floating damage numbers
         self.spell_effects = []  # Active spell visual effects
 
@@ -717,6 +718,7 @@ class Game:
         self.ground_items = pygame.sprite.Group()
         self.gold_drops = pygame.sprite.Group()
         self.projectiles = []
+        self.enemy_projectiles = []
         self.floating_texts = []
         self.spell_effects = []
         self.in_boss_area = False
@@ -751,6 +753,7 @@ class Game:
         self.ground_items = pygame.sprite.Group()
         self.gold_drops = pygame.sprite.Group()
         self.projectiles = []
+        self.enemy_projectiles = []
         self.floating_texts = []
         self.spell_effects = []
         self.in_boss_area = False
@@ -1085,10 +1088,18 @@ class Game:
         elif self.state == self.STATE_SAVE_DIALOG:
             if btn == CONTROLLER_BUTTON_ATTACK:
                 if not self.save_name_editing:
-                    # Auto-name for controller users
+                    # Auto-name for controller users: use existing name or generate unique one
                     slot = self.dialog_cursor
                     existing = self.save_slots_cache[slot]
-                    self.save_name_input = existing["name"] if existing else f"Save {slot + 1}"
+                    if existing:
+                        self.save_name_input = existing["name"]
+                    elif self.player:
+                        hero = getattr(self.player, 'hero_name', 'Hero')
+                        lv = getattr(self.player, 'level', 1)
+                        stg = self.current_stage_num
+                        self.save_name_input = f"{hero} Lv{lv} Stg{stg}"[:20]
+                    else:
+                        self.save_name_input = f"Save {slot + 1}"
                     self._execute_save()
             elif btn in (CONTROLLER_BUTTON_PICKUP, CONTROLLER_BUTTON_BACK):
                 if self.save_name_editing:
@@ -1138,27 +1149,44 @@ class Game:
         elif self.state == self.STATE_INVENTORY:
             if btn in (CONTROLLER_BUTTON_INVENTORY, CONTROLLER_BUTTON_PICKUP,
                        CONTROLLER_BUTTON_BACK, CONTROLLER_BUTTON_START):
+                # Close inventory — if holding an item, return it to inventory (or drop)
                 self.player.inventory.gamepad_cursor = -1
-                held = self.player.inventory.held_item
-                self.player.inventory.close()
                 if self.player.inventory.held_item:
-                    self._drop_held_item(self.player.inventory.held_item)
+                    # Try to put held item back; if inventory is full, drop it
+                    leftover = self.player.inventory.add_item(
+                        self.player.inventory.held_item.item_data,
+                        self.player.inventory.held_item.quantity)
+                    if leftover > 0:
+                        self.player.inventory.held_item.quantity = leftover
+                        self._drop_held_item(self.player.inventory.held_item)
                     self.player.inventory.held_item = None
+                self.player.inventory.close()
                 self.state = self.STATE_PLAYING
             elif btn == CONTROLLER_BUTTON_ATTACK:
-                # A button: use/wield item at gamepad cursor
+                # A button: pick up item to hand (if not holding) or place held item
                 cursor = self.player.inventory.gamepad_cursor
                 if 0 <= cursor < 25:
+                    if self.player.inventory.held_item:
+                        # Place held item at cursor slot
+                        self.player.inventory.place_held(cursor)
+                        self.audio.play_sfx("menu_move")
+                    else:
+                        # Pick up item at cursor slot
+                        if self.player.inventory.pick_up_slot(cursor):
+                            self.audio.play_sfx("menu_move")
+            elif btn == CONTROLLER_BUTTON_MINIMAP:
+                # Y button: use/equip item (when not holding) or drop held item to ground
+                cursor = self.player.inventory.gamepad_cursor
+                if self.player.inventory.held_item:
+                    # Cancel pick-up and drop held item to ground
+                    dropped = self.player.inventory.drop_held()
+                    if dropped:
+                        self._drop_held_item(dropped)
+                        self.audio.play_sfx("menu_cancel")
+                elif 0 <= cursor < 25:
                     stack = self.player.inventory.get_slot(cursor)
                     if stack:
                         self._use_item(cursor)
-            elif btn == CONTROLLER_BUTTON_MINIMAP:
-                # Y button: drop item at gamepad cursor
-                cursor = self.player.inventory.gamepad_cursor
-                if 0 <= cursor < 25:
-                    stack = self.player.inventory.get_slot(cursor)
-                    if stack:
-                        self._drop_item(cursor)
 
         elif self.state == self.STATE_SHOP:
             if btn in (CONTROLLER_BUTTON_BACK, CONTROLLER_BUTTON_START,
@@ -2431,6 +2459,7 @@ class Game:
         self.current_stage_type = "town"
         # Clear transient state
         self.projectiles = []
+        self.enemy_projectiles = []
         self.floating_texts = []
         self.spell_effects = []
         self.ground_items = pygame.sprite.Group()
@@ -2566,6 +2595,19 @@ class Game:
                         other.is_enraged = True
                         other._just_enraged = True
 
+        # Spawn enemy ranged projectiles from monsters that fired this frame
+        for monster in self.stage.monsters:
+            shot = monster.pending_ranged_shot
+            if shot:
+                style = "magic" if monster.ranged_homing else "bullet"
+                ep = Projectile(
+                    shot["x"], shot["y"], shot["dir"],
+                    shot["speed"], shot["damage"], shot["max_range"],
+                    style=style, homing=False)
+                # Mark as enemy projectile so we can tint it red
+                ep._is_enemy = True
+                self.enemy_projectiles.append(ep)
+
         # NPCs
         self.hud.near_merchant = False
         for npc in self.stage.npcs:
@@ -2611,6 +2653,22 @@ class Game:
                 self._process_chest_hits(chest_hits)
             if not proj.is_alive:
                 self.projectiles.remove(proj)
+
+        # Enemy projectiles — move and check collision with player
+        for ep in self.enemy_projectiles[:]:
+            ep.update(dt, self.stage.obstacle_rects, [], [])  # no monster targets
+            if ep.is_alive:
+                # Check collision with player
+                if ep.collision_rect.colliderect(self.player.collision_rect):
+                    raw = ep.damage
+                    actual = self.player.take_damage(raw)
+                    self._spawn_floating_text(
+                        self.player.world_x, self.player.world_y,
+                        str(actual), (255, 80, 80))
+                    self.audio.play_sfx("hit")
+                    ep.is_alive = False
+            if not ep.is_alive:
+                self.enemy_projectiles.remove(ep)
 
         # Ground items
         for item in self.ground_items:
@@ -3739,6 +3797,7 @@ class Game:
         self.ground_items = pygame.sprite.Group()
         self.gold_drops = pygame.sprite.Group()
         self.projectiles = []
+        self.enemy_projectiles = []
         self.floating_texts = []
         self.spell_effects = []
         self.in_boss_area = False
@@ -4489,9 +4548,13 @@ class Game:
         for gold in self.gold_drops:
             gold.draw(self.screen, cam)
 
-        # Projectiles
+        # Player projectiles
         for proj in self.projectiles:
             proj.draw(self.screen, cam)
+
+        # Enemy projectiles (drawn with a red tint overlay to distinguish from player shots)
+        for ep in self.enemy_projectiles:
+            ep.draw(self.screen, cam)
 
         # Entity layer (y-sorted)
         entities = []

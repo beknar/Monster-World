@@ -438,6 +438,7 @@ SFX_PATHS = {
     "magic": os.path.join(SOUNDS_PATH, "Game", "Magic1.wav"),
     "fireball": os.path.join(SOUNDS_PATH, "Game", "Fireball.wav"),
     "explosion": os.path.join(SOUNDS_PATH, "Game", "Explosion.wav"),
+    "gunshot": os.path.join(SOUNDS_PATH, "Game", "Gunshot.wav"),
 }
 
 # Key bindings
