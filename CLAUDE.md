@@ -296,11 +296,12 @@ The game auto-detects Xbox controllers via `pygame.joystick` on startup and supp
 
 The very first thing the player sees on launch is a **splash screen** (`STATE_SPLASH`) that plays before the main menu. It displays a cinematic intro video in the upper half of the screen and a large **PLAY** button in the lower half.
 
-**Layout:**
+**Layout (top to bottom):**
 - Black background fills the whole screen
-- Intro video occupies the top half (`SCREEN_HEIGHT // 2`), centered horizontally, aspect-ratio-preserving (1920×1080 source, 16:9)
-- Large golden **PLAY** button centered in the lower half — highlights on mouse-hover
-- Subtle "or press any key" hint below the button
+- **"Monster World" title** — rendered in the title font (gold, with a dark drop-shadow) centred at the very top of the screen above the video
+- **Intro video** — fills the remaining top-half space below the title, centered horizontally, aspect-ratio-preserving (1920×1080 source, 16:9)
+- **Large golden PLAY button** — centred in the lower half, highlights brighter gold on mouse-hover
+- **Hint text** below the button — shows `"or press any key"` when keyboard only, or `"or press  A  on your controller"` when an Xbox controller is detected
 
 **Assets (randomly selected each launch from `newassets/custom/`):**
 - Videos: `mw-openart1.mp4` or `mw-openart2.mp4` (1920×1080, 24 fps, ~15 s each — looped until Play is pressed)
@@ -309,25 +310,27 @@ The very first thing the player sees on launch is a **splash screen** (`STATE_SP
 **Advancing past the splash:**
 - Click the **PLAY** button (left mouse button)
 - Press **any keyboard key**
-- Press **any controller button**
-All three methods call `_enter_menu_from_splash()` which releases the `cv2.VideoCapture`, stops the splash music, transitions to `STATE_MENU`, and starts the normal `"menu"` music loop.
+- Press **any controller button** (A, B, X, Y, Start, Back, bumpers, triggers, …) — via `_handle_controller_button()`
+- Press **any D-pad direction** — via `_handle_controller_hat()`
+All four paths call `_enter_menu_from_splash()` which releases the `cv2.VideoCapture`, stops the splash music, transitions to `STATE_MENU`, and starts the normal `"menu"` music loop.
 
 **Video decoding:**
 - `cv2.VideoCapture` opens the MP4 file; frames are decoded each game tick in `_update_splash(dt)` at the video's native 24 fps (frame timer accumulates `dt`; advances when `timer >= 1/video_fps`)
 - Frames are converted BGR→RGB then turned into a `pygame.Surface` via `pygame.surfarray.make_surface(frame.swapaxes(0, 1))`
-- Scaled to fit the top half each frame via `pygame.transform.scale`
+- Scaled to fit the space below the title in the top half each frame via `pygame.transform.scale`
 
 **State flow:**
 ```
-Game launch → STATE_SPLASH → (Play / key / button) → STATE_MENU → (Start Game) → STATE_PLAYING
+Game launch → STATE_SPLASH → (Play / key / button / d-pad) → STATE_MENU → (Start Game) → STATE_PLAYING
 ```
 
 **Implementation:**
 - `STATE_SPLASH = "splash"` — new state constant in `Game`
 - `game._init_splash()` — called at end of `__init__`; picks random video + music, opens VideoCapture, decodes first frame, starts music
 - `game._update_splash(dt)` — frame-rate-limited video advance; called from `update()`
-- `game._draw_splash()` — renders black bg + scaled video frame + Play button + hint text; called from `draw()`
-- `game._enter_menu_from_splash()` — cleanup + state transition; called from keyboard, mouse, and controller handlers
+- `game._draw_splash()` — renders: black bg → gold title with shadow → scaled video frame → Play button → adaptive hint text; called from `draw()`
+- `game._enter_menu_from_splash()` — cleanup + state transition; called from keyboard, mouse, button, and hat handlers
+- `_handle_controller_hat()` — `STATE_SPLASH` case added: any D-pad direction calls `_enter_menu_from_splash()`
 - `audio.play_music_file(path)` — new `AudioManager` method that loads a music file by path (bypasses `MUSIC_TRACKS` dict)
 - `settings.CUSTOM_ASSETS_PATH = os.path.join(NEWASSETS_PATH, "custom")` — path constant for splash assets
 - `_on_music_ended()` early-returns for `STATE_SPLASH` (splash music loops; no track rotation needed)

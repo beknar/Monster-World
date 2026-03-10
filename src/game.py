@@ -398,18 +398,38 @@ class Game:
                     frame_rgb.swapaxes(0, 1))
 
     def _draw_splash(self):
-        """Render the splash screen: intro video in the top half, large Play
-        button in the bottom half."""
+        """Render the splash screen: game title, intro video in the top half,
+        large Play button in the bottom half."""
         sw, sh = settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT
         self.screen.fill(BLACK)
+        scale = settings.get_font_scale()
 
-        # ── Video panel (top half) ───────────────────────────────────────────
-        video_area_h = sh // 2
-        if self._splash_current_frame is not None:
+        # ── Game title above the video ───────────────────────────────────────
+        title_pad_top = int(14 * scale)
+        title_pad_bot = int(10 * scale)
+
+        # Shadow layer (offset by 2–3 px, dark colour)
+        title_shadow = self.title_font.render(TITLE, True, (30, 20, 5))
+        shadow_x = (sw - title_shadow.get_width()) // 2 + int(3 * scale)
+        shadow_y = title_pad_top + int(3 * scale)
+        self.screen.blit(title_shadow, (shadow_x, shadow_y))
+
+        # Gold title text
+        title_surf = self.title_font.render(TITLE, True, (255, 215, 60))
+        title_x = (sw - title_surf.get_width()) // 2
+        title_y = title_pad_top
+        self.screen.blit(title_surf, (title_x, title_y))
+
+        title_bottom = title_y + title_surf.get_height() + title_pad_bot
+
+        # ── Video panel (top half, below the title) ──────────────────────────
+        video_area_top = title_bottom
+        video_area_h   = sh // 2 - video_area_top
+        if video_area_h > 0 and self._splash_current_frame is not None:
             vw = self._splash_current_frame.get_width()
             vh = self._splash_current_frame.get_height()
             aspect = vw / max(1, vh)
-            # Fit inside the top half, preserving aspect ratio
+            # Fit inside the available rectangle, preserving aspect ratio
             if int(video_area_h * aspect) <= sw:
                 disp_h = video_area_h
                 disp_w = int(video_area_h * aspect)
@@ -419,11 +439,10 @@ class Game:
             scaled_video = pygame.transform.scale(
                 self._splash_current_frame, (disp_w, disp_h))
             blit_x = (sw - disp_w) // 2
-            blit_y = (video_area_h - disp_h) // 2
+            blit_y = video_area_top + (video_area_h - disp_h) // 2
             self.screen.blit(scaled_video, (blit_x, blit_y))
 
         # ── Play button (bottom half) ────────────────────────────────────────
-        scale = settings.get_font_scale()
         pad_x = int(80 * scale)
         pad_y = int(24 * scale)
 
@@ -458,8 +477,11 @@ class Game:
         ty = btn_y + (btn_h - play_surf.get_height()) // 2
         self.screen.blit(play_surf, (tx, ty))
 
-        # Subtle hint text below the button
-        hint = "or press any key"
+        # Hint text below the button — adapts to keyboard vs controller
+        if self.controller_connected:
+            hint = "or press  A  on your controller"
+        else:
+            hint = "or press any key"
         hint_surf = self.small_font.render(hint, True, GRAY)
         self.screen.blit(hint_surf,
                          ((sw - hint_surf.get_width()) // 2,
@@ -1374,6 +1396,11 @@ class Game:
         if not event.value:
             return
         hx, hy = event.value
+
+        if self.state == self.STATE_SPLASH:
+            # Any D-pad direction advances past the splash screen
+            self._enter_menu_from_splash()
+            return
 
         if self.state == self.STATE_PLAYING:
             # D-pad L/R cycles spell/ability selection during gameplay
