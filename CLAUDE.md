@@ -309,10 +309,12 @@ The very first thing the player sees on launch is a **splash screen** (`STATE_SP
 
 **Advancing past the splash:**
 - Click the **PLAY** button (left mouse button)
-- Press **any keyboard key**
+- Press **any keyboard key** except the exempt set (see below)
 - Press **any controller button** (A, B, X, Y, Start, Back, bumpers, triggers, …) — via `_handle_controller_button()`
 - Press **any D-pad direction** — via `_handle_controller_hat()`
 All four paths call `_enter_menu_from_splash()` which releases the `cv2.VideoCapture`, stops the splash music, transitions to `STATE_MENU`, and starts the normal `"menu"` music loop.
+
+**Exempt keys (do NOT advance past splash):** `Alt` (left/right), `Win/Super` (left/right), `R`. Defined in the class-level frozenset `Game._SPLASH_EXEMPT_KEYS`.
 
 **Video decoding:**
 - `cv2.VideoCapture` opens the MP4 file; frames are decoded each game tick in `_update_splash(dt)` at the video's native 24 fps (frame timer accumulates `dt`; advances when `timer >= 1/video_fps`)

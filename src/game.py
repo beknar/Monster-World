@@ -1002,10 +1002,19 @@ class Game:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 self._handle_mouse_click(event)
 
+    # Keys that must NOT advance past the splash screen (modifier / system keys)
+    _SPLASH_EXEMPT_KEYS = frozenset({
+        pygame.K_LALT, pygame.K_RALT,          # Alt keys
+        pygame.K_LMETA, pygame.K_RMETA,         # Windows / Super keys
+        pygame.K_LSUPER, pygame.K_RSUPER,       # (aliases on some platforms)
+        pygame.K_r,                             # R key
+    })
+
     def _handle_keydown(self, event):
         if self.state == self.STATE_SPLASH:
-            # Any key press advances past the splash screen
-            self._enter_menu_from_splash()
+            # Advance to the menu on any key except the exempt set
+            if event.key not in self._SPLASH_EXEMPT_KEYS:
+                self._enter_menu_from_splash()
             return
 
         if self.state == self.STATE_MENU:
