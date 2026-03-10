@@ -2,6 +2,9 @@ import pygame
 import os
 import ctypes
 import math
+import random
+import cv2
+import numpy as np
 import src.settings as settings
 from src.settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, FPS, TITLE, TILE_SIZE,
@@ -21,6 +24,7 @@ from src.settings import (
     CHAIN_AGGRO_RANGE,
     ARMOR_DEFS, SPELL_DEFS, GRIT_ABILITIES, XP_THRESHOLDS,
     STAGE_BOSSES, BOSS_STAGE_SCALING,
+    CUSTOM_ASSETS_PATH,
 )
 from src.player import Player
 from src.camera import Camera
@@ -182,6 +186,7 @@ class Game:
     """Main game class managing the game loop and state."""
 
     # Game states
+    STATE_SPLASH = "splash"        # Intro splash screen with video and Play button
     STATE_MENU = "menu"
     STATE_HELP = "help"
     STATE_OPTIONS = "options"
@@ -211,7 +216,7 @@ class Game:
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock = pygame.time.Clock()
         self.running = True
-        self.state = self.STATE_MENU
+        self.state = self.STATE_SPLASH
 
         # Fonts (scaled to resolution)
         self._create_fonts()
@@ -305,8 +310,15 @@ class Game:
         self._shop_ctrl_hold_initial = 0.5    # seconds before repeat starts
         self._shop_ctrl_hold_interval = 0.12  # seconds between repeated sells
 
-        # Play menu music
-        self.audio.play_music("menu")
+        # Splash screen state (video + music; initialized below)
+        self._splash_cap = None           # cv2.VideoCapture for the splash video
+        self._splash_video_fps = 24.0
+        self._splash_frame_timer = 0.0
+        self._splash_current_frame = None  # pygame.Surface of the current video frame
+        self._splash_play_rect = None      # Rect of the Play button (set during draw)
+
+        # Start the splash screen (plays random intro video + music)
+        self._init_splash()
 
     def _create_fonts(self):
         """Create all fonts scaled to the current resolution."""
@@ -326,6 +338,132 @@ class Game:
         else:
             self.joystick = None
             self.controller_connected = False
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Splash screen
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _init_splash(self):
+        """Open a randomly chosen intro video and start a randomly chosen music
+        track.  The first video frame is decoded immediately so the splash screen
+        is not blank on the very first draw."""
+        videos = ["mw-openart1.mp4", "mw-openart2.mp4"]
+        music_files = ["mw1.wav", "mw2.wav"]
+
+        video_path = os.path.join(CUSTOM_ASSETS_PATH, random.choice(videos))
+        music_path = os.path.join(CUSTOM_ASSETS_PATH, random.choice(music_files))
+
+        # Open video
+        self._splash_cap = cv2.VideoCapture(video_path)
+        self._splash_video_fps = self._splash_cap.get(cv2.CAP_PROP_FPS) or 24.0
+        self._splash_frame_timer = 0.0
+
+        # Decode first frame immediately
+        ret, frame = self._splash_cap.read()
+        if ret:
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            self._splash_current_frame = pygame.surfarray.make_surface(
+                frame_rgb.swapaxes(0, 1))
+
+        # Play music (loops indefinitely until we leave the splash)
+        self.audio.play_music_file(music_path)
+
+    def _enter_menu_from_splash(self):
+        """Release video resources and transition to the main menu."""
+        if self._splash_cap is not None:
+            self._splash_cap.release()
+            self._splash_cap = None
+        self._splash_current_frame = None
+        self._splash_play_rect = None
+
+        self.state = self.STATE_MENU
+        self.audio.play_music("menu")
+
+    def _update_splash(self, dt: float):
+        """Advance the splash video by *dt* seconds, looping when finished."""
+        if self._splash_cap is None:
+            return
+        self._splash_frame_timer += dt
+        frame_duration = 1.0 / self._splash_video_fps
+        while self._splash_frame_timer >= frame_duration:
+            self._splash_frame_timer -= frame_duration
+            ret, frame = self._splash_cap.read()
+            if not ret:
+                # Loop: rewind to the beginning
+                self._splash_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = self._splash_cap.read()
+            if ret:
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                self._splash_current_frame = pygame.surfarray.make_surface(
+                    frame_rgb.swapaxes(0, 1))
+
+    def _draw_splash(self):
+        """Render the splash screen: intro video in the top half, large Play
+        button in the bottom half."""
+        sw, sh = settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT
+        self.screen.fill(BLACK)
+
+        # ── Video panel (top half) ───────────────────────────────────────────
+        video_area_h = sh // 2
+        if self._splash_current_frame is not None:
+            vw = self._splash_current_frame.get_width()
+            vh = self._splash_current_frame.get_height()
+            aspect = vw / max(1, vh)
+            # Fit inside the top half, preserving aspect ratio
+            if int(video_area_h * aspect) <= sw:
+                disp_h = video_area_h
+                disp_w = int(video_area_h * aspect)
+            else:
+                disp_w = sw
+                disp_h = int(sw / aspect)
+            scaled_video = pygame.transform.scale(
+                self._splash_current_frame, (disp_w, disp_h))
+            blit_x = (sw - disp_w) // 2
+            blit_y = (video_area_h - disp_h) // 2
+            self.screen.blit(scaled_video, (blit_x, blit_y))
+
+        # ── Play button (bottom half) ────────────────────────────────────────
+        scale = settings.get_font_scale()
+        pad_x = int(80 * scale)
+        pad_y = int(24 * scale)
+
+        play_surf_measure = self.title_font.render("PLAY", True, WHITE)
+        btn_w = play_surf_measure.get_width() + pad_x * 2
+        btn_h = play_surf_measure.get_height() + pad_y * 2
+
+        btn_x = (sw - btn_w) // 2
+        # Centre button vertically inside the lower half of the screen
+        bottom_half_top = sh // 2
+        btn_y = bottom_half_top + (sh // 2 - btn_h) // 2
+
+        self._splash_play_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
+
+        # Colour shifts on hover
+        mx, my = pygame.mouse.get_pos()
+        hovering = self._splash_play_rect.collidepoint(mx, my)
+        btn_bg     = (180, 140, 20) if hovering else (100, 75,  8)
+        btn_border = (255, 215, 60) if hovering else (200, 155, 25)
+        text_color = (255, 255, 200) if hovering else (240, 210, 100)
+
+        # Button body
+        br = int(14 * scale)
+        pygame.draw.rect(self.screen, btn_bg,     self._splash_play_rect,
+                         border_radius=br)
+        pygame.draw.rect(self.screen, btn_border, self._splash_play_rect,
+                         width=max(2, int(3 * scale)), border_radius=br)
+
+        # Button label
+        play_surf = self.title_font.render("PLAY", True, text_color)
+        tx = btn_x + (btn_w - play_surf.get_width())  // 2
+        ty = btn_y + (btn_h - play_surf.get_height()) // 2
+        self.screen.blit(play_surf, (tx, ty))
+
+        # Subtle hint text below the button
+        hint = "or press any key"
+        hint_surf = self.small_font.render(hint, True, GRAY)
+        self.screen.blit(hint_surf,
+                         ((sw - hint_surf.get_width()) // 2,
+                          btn_y + btn_h + int(12 * scale)))
 
     def _check_controller(self):
         """Re-check for controller connection (hot-plug support)."""
@@ -392,8 +530,8 @@ class Game:
 
     def _on_music_ended(self):
         """Called when a music track finishes. Auto-continues to the next track."""
-        # Don't auto-continue in menu, game over, dying, or win states
-        if self.state in (self.STATE_MENU, self.STATE_GAME_OVER,
+        # Don't auto-continue in menu, splash, game over, dying, or win states
+        if self.state in (self.STATE_SPLASH, self.STATE_MENU, self.STATE_GAME_OVER,
                           self.STATE_DYING, self.STATE_WIN):
             return
         # If in boss area or boss is chasing, replay boss music only if boss is still alive
@@ -843,6 +981,11 @@ class Game:
                 self._handle_mouse_click(event)
 
     def _handle_keydown(self, event):
+        if self.state == self.STATE_SPLASH:
+            # Any key press advances past the splash screen
+            self._enter_menu_from_splash()
+            return
+
         if self.state == self.STATE_MENU:
             if event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
                 self.new_game()
@@ -1037,6 +1180,11 @@ class Game:
     def _handle_controller_button(self, event):
         """Handle controller button press events."""
         btn = event.button
+
+        if self.state == self.STATE_SPLASH:
+            # Any button press advances past the splash screen
+            self._enter_menu_from_splash()
+            return
 
         if self.state == self.STATE_MENU:
             if btn == CONTROLLER_BUTTON_START:
@@ -1384,6 +1532,13 @@ class Game:
                     self.audio.play_sfx("menu_move")
 
     def _handle_mouse_click(self, event):
+        if self.state == self.STATE_SPLASH:
+            if event.button == 1 and self._splash_play_rect is not None:
+                if self._splash_play_rect.collidepoint(event.pos):
+                    self.audio.play_sfx("menu_accept")
+                    self._enter_menu_from_splash()
+            return
+
         if self.state == self.STATE_HELP:
             if event.button == 1:
                 # Back button top-left (scaled)
@@ -2518,7 +2673,9 @@ class Game:
 
     def update(self, dt: float):
         """Update game state."""
-        if self.state == self.STATE_PLAYING:
+        if self.state == self.STATE_SPLASH:
+            self._update_splash(dt)
+        elif self.state == self.STATE_PLAYING:
             self._update_playing(dt)
         elif self.state == self.STATE_INVENTORY:
             self.player.inventory.update_hover(pygame.mouse.get_pos())
@@ -2765,7 +2922,9 @@ class Game:
         """Render the current frame."""
         self.screen.fill(BLACK)
 
-        if self.state == self.STATE_MENU:
+        if self.state == self.STATE_SPLASH:
+            self._draw_splash()
+        elif self.state == self.STATE_MENU:
             self._draw_menu()
         elif self.state == self.STATE_HELP:
             self._draw_help()

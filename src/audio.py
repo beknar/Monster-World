@@ -38,6 +38,16 @@ class AudioManager:
             except Exception:
                 pass
 
+    def play_music_file(self, path: str, loops: int = -1):
+        """Play a music file directly by file path (bypasses MUSIC_TRACKS lookup)."""
+        try:
+            pygame.mixer.music.load(path)
+            pygame.mixer.music.set_volume(self.music_volume)
+            pygame.mixer.music.play(loops)
+            self.current_music = path
+        except Exception:
+            pass
+
     def stop_music(self):
         pygame.mixer.music.stop()
         self.current_music = None

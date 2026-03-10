@@ -140,6 +140,9 @@ MUSIC_PATH = os.path.join(NEWASSETS_PATH, "Fantasy RPG Complete OST",
 DATA_PATH = os.path.join(BASE_DIR, "data")
 SAVES_PATH = _saves_path()   # writable per-user location (see _saves_path())
 
+# Custom assets (splash-screen videos and music)
+CUSTOM_ASSETS_PATH = os.path.join(NEWASSETS_PATH, "custom")
+
 # Sprite directions (row order in sprite sheets)
 DIR_DOWN = 0
 DIR_LEFT = 1

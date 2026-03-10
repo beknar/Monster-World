@@ -20,10 +20,13 @@ A 2D top-down action RPG built with Python and pygame. The player controls a her
 ```bash
 python -m venv venv
 source venv/Scripts/activate   # Windows Git Bash
-pip install pygame
+pip install pygame opencv-python numpy
 ```
 
 Always activate the venv before running or installing packages.
+
+- **opencv-python (`cv2`)** — required for splash-screen MP4 video decoding
+- **numpy** — required by cv2 frame array operations
 
 ## Project Structure
 
@@ -288,6 +291,48 @@ The game auto-detects Xbox controllers via `pygame.joystick` on startup and supp
 - `shop.controller_connected` flag adapts panel titles and shows controller hint bar
 - All screen hints (menu, pause, options, help, game over, victory) adapt to show controller buttons when connected
 - Help screen includes full keyboard and controller reference tables
+
+### Splash Screen
+
+The very first thing the player sees on launch is a **splash screen** (`STATE_SPLASH`) that plays before the main menu. It displays a cinematic intro video in the upper half of the screen and a large **PLAY** button in the lower half.
+
+**Layout:**
+- Black background fills the whole screen
+- Intro video occupies the top half (`SCREEN_HEIGHT // 2`), centered horizontally, aspect-ratio-preserving (1920×1080 source, 16:9)
+- Large golden **PLAY** button centered in the lower half — highlights on mouse-hover
+- Subtle "or press any key" hint below the button
+
+**Assets (randomly selected each launch from `newassets/custom/`):**
+- Videos: `mw-openart1.mp4` or `mw-openart2.mp4` (1920×1080, 24 fps, ~15 s each — looped until Play is pressed)
+- Music: `mw1.wav` or `mw2.wav` (loaded via `audio.play_music_file(path)` — loops indefinitely)
+
+**Advancing past the splash:**
+- Click the **PLAY** button (left mouse button)
+- Press **any keyboard key**
+- Press **any controller button**
+All three methods call `_enter_menu_from_splash()` which releases the `cv2.VideoCapture`, stops the splash music, transitions to `STATE_MENU`, and starts the normal `"menu"` music loop.
+
+**Video decoding:**
+- `cv2.VideoCapture` opens the MP4 file; frames are decoded each game tick in `_update_splash(dt)` at the video's native 24 fps (frame timer accumulates `dt`; advances when `timer >= 1/video_fps`)
+- Frames are converted BGR→RGB then turned into a `pygame.Surface` via `pygame.surfarray.make_surface(frame.swapaxes(0, 1))`
+- Scaled to fit the top half each frame via `pygame.transform.scale`
+
+**State flow:**
+```
+Game launch → STATE_SPLASH → (Play / key / button) → STATE_MENU → (Start Game) → STATE_PLAYING
+```
+
+**Implementation:**
+- `STATE_SPLASH = "splash"` — new state constant in `Game`
+- `game._init_splash()` — called at end of `__init__`; picks random video + music, opens VideoCapture, decodes first frame, starts music
+- `game._update_splash(dt)` — frame-rate-limited video advance; called from `update()`
+- `game._draw_splash()` — renders black bg + scaled video frame + Play button + hint text; called from `draw()`
+- `game._enter_menu_from_splash()` — cleanup + state transition; called from keyboard, mouse, and controller handlers
+- `audio.play_music_file(path)` — new `AudioManager` method that loads a music file by path (bypasses `MUSIC_TRACKS` dict)
+- `settings.CUSTOM_ASSETS_PATH = os.path.join(NEWASSETS_PATH, "custom")` — path constant for splash assets
+- `_on_music_ended()` early-returns for `STATE_SPLASH` (splash music loops; no track rotation needed)
+
+**PyInstaller:** `newassets/custom/` is already included via the `('newassets', 'newassets')` glob in `MonsterWorld.spec`. `cv2` and `numpy` added to `hiddenimports`.
 
 ### Main Menu and Character Selection
 

@@ -44,6 +44,11 @@ a = Analysis(
         'pygame.transform',
         'pygame.draw',
         'pygame.joystick',
+        # OpenCV (used for splash-screen video decoding)
+        'cv2',
+        'numpy',
+        'numpy.core',
+        'numpy.core._multiarray_umath',
     ],
     hookspath=[],
     hooksconfig={},
