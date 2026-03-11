@@ -17,8 +17,16 @@
 #   Linux   : ~/.local/share/MonsterWorld/saves/
 
 import os
+from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
+
+# ── Collect cv2 (OpenCV) — binary extensions + DLLs + data ─────────────────
+# collect_all() gathers everything cv2 needs: the .pyd extension, all dependent
+# DLLs, any pure-Python sub-modules, and data files.  Without this, PyInstaller
+# only records the module name but fails to bundle the actual binaries, causing
+# "ModuleNotFoundError: No module named 'cv2'" at runtime.
+cv2_datas, cv2_binaries, cv2_hiddenimports = collect_all('cv2')
 
 # ── Data files bundled alongside the executable ─────────────────────────────
 # Format: (source_path, dest_folder_inside_bundle)
@@ -32,8 +40,8 @@ added_files = [
 a = Analysis(
     ['main.py'],
     pathex=['.'],
-    binaries=[],
-    datas=added_files,
+    binaries=cv2_binaries,
+    datas=added_files + cv2_datas,
     hiddenimports=[
         # pygame occasionally needs these sub-modules explicitly imported
         # (pygame._view was removed in pygame 2.x — do not add it back)
@@ -44,12 +52,11 @@ a = Analysis(
         'pygame.transform',
         'pygame.draw',
         'pygame.joystick',
-        # OpenCV (used for splash-screen video decoding)
-        'cv2',
+        # numpy (required by cv2 frame array operations)
         'numpy',
         'numpy.core',
         'numpy.core._multiarray_umath',
-    ],
+    ] + cv2_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

@@ -1242,7 +1242,8 @@ The spec file (project root) controls the build:
 - **`datas`**: recursively bundles `newassets/` (sprites, tilesets, sounds, music) and `data/` (JSON game data) into the bundle
 - **`console=False`**: no terminal window (windowed game)
 - **`onedir` mode**: produces a folder rather than a single `.exe`; pygame games launch significantly faster this way since assets are not re-extracted on every run
-- **`hiddenimports`**: explicitly lists `pygame` sub-modules, plus `cv2`, `numpy`, and `numpy.core` (required for splash-screen video decoding) that PyInstaller may otherwise miss
+- **`cv2` (OpenCV) bundling — `collect_all('cv2')`**: OpenCV cannot be bundled via `hiddenimports` alone. The `.pyd` binary extension and all dependent DLLs must be explicitly collected using `collect_all('cv2')` from `PyInstaller.utils.hooks`. This returns `cv2_datas`, `cv2_binaries`, and `cv2_hiddenimports`, which are wired into the `Analysis()` call (`binaries=cv2_binaries`, `datas=added_files + cv2_datas`, `hiddenimports=[...] + cv2_hiddenimports`). Without this, the bundle produces `ModuleNotFoundError: No module named 'cv2'` at runtime even if `cv2` appears in `hiddenimports`.
+- **`hiddenimports`**: explicitly lists `pygame` sub-modules plus `numpy` and `numpy.core` (required for cv2 frame array operations); cv2 hidden imports are appended via `cv2_hiddenimports` from `collect_all('cv2')`
 - **`excludes`**: only `tkinter` is excluded (large and genuinely unused). **Do NOT add other stdlib modules here** — PyInstaller's own runtime hook (`pyi_rth_pkgres`) imports `pkg_resources` which pulls in `plistlib`, `email`, `xml`, and other stdlib modules at startup. Excluding any of them causes a `ModuleNotFoundError` crash before any game code runs.
 
 ### PyInstaller-aware path resolution (`src/settings.py`)
