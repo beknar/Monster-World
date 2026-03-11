@@ -348,7 +348,7 @@ class Game:
         track.  The first video frame is decoded immediately so the splash screen
         is not blank on the very first draw."""
         videos = ["mw-openart1.mp4", "mw-openart2.mp4"]
-        music_files = ["mw1.wav", "mw2.wav"]
+        music_files = ["mw1.mp3", "mw2.mp3"]
 
         video_path = os.path.join(CUSTOM_ASSETS_PATH, random.choice(videos))
         music_path = os.path.join(CUSTOM_ASSETS_PATH, random.choice(music_files))
