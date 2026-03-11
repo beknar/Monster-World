@@ -1243,7 +1243,7 @@ The spec file (project root) controls the build:
 - **`console=False`**: no terminal window (windowed game)
 - **`onedir` mode**: produces a folder rather than a single `.exe`; pygame games launch significantly faster this way since assets are not re-extracted on every run
 - **`hiddenimports`**: explicitly lists `pygame` sub-modules, plus `cv2`, `numpy`, and `numpy.core` (required for splash-screen video decoding) that PyInstaller may otherwise miss
-- **`excludes`**: strips unused stdlib modules (`tkinter`, `http`, etc.) to reduce bundle size. **`xml` must NOT be excluded** — `pkg_resources` → `plistlib` requires it at runtime; excluding it causes a `ModuleNotFoundError` crash on launch
+- **`excludes`**: only `tkinter` is excluded (large and genuinely unused). **Do NOT add other stdlib modules here** — PyInstaller's own runtime hook (`pyi_rth_pkgres`) imports `pkg_resources` which pulls in `plistlib`, `email`, `xml`, and other stdlib modules at startup. Excluding any of them causes a `ModuleNotFoundError` crash before any game code runs.
 
 ### PyInstaller-aware path resolution (`src/settings.py`)
 `BASE_DIR` is computed by `_base_path()`:

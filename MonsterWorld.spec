@@ -54,16 +54,12 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # Exclude heavy stdlib / third-party modules not used by the game
-        # NOTE: do NOT exclude 'xml' — pkg_resources → plistlib requires it
+        # Only exclude tkinter — it is large and genuinely unused.
+        # Do NOT exclude stdlib modules like xml, email, http, etc.:
+        # PyInstaller's own runtime hook (pyi_rth_pkgres) imports pkg_resources
+        # which pulls in plistlib → xml, email, and others at startup.
+        # Excluding them causes ModuleNotFoundError before any game code runs.
         'tkinter',
-        'unittest',
-        'email',
-        'http',
-        'pydoc',
-        'doctest',
-        'difflib',
-        'multiprocessing',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
