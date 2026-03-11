@@ -1233,9 +1233,11 @@ The game can be packaged into a standalone distributable folder using PyInstalle
 ```bash
 # From the project root with venv active
 pip install pyinstaller
-pyinstaller MonsterWorld.spec
+python -m PyInstaller -y MonsterWorld.spec
 # Output: dist/MonsterWorld/  — distribute this entire folder
 ```
+
+> **Important:** Always use `python -m PyInstaller`, never bare `pyinstaller`. When multiple Python versions are installed (e.g., 3.11 and 3.12), the `pyinstaller` script in PATH may belong to a *different* Python than `python`. Running via `python -m PyInstaller` guarantees both use the same interpreter, so `collect_all('cv2')` actually finds the cv2 binaries. Using bare `pyinstaller` from the wrong Python produces `ModuleNotFoundError: No module named 'cv2'` at runtime even though cv2 is installed.
 
 ### `MonsterWorld.spec`
 The spec file (project root) controls the build:

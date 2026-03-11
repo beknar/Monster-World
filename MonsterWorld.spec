@@ -3,7 +3,12 @@
 #
 # Build command (from the project root with venv active):
 #   pip install pyinstaller
-#   pyinstaller -y MonsterWorld.spec
+#   python -m PyInstaller -y MonsterWorld.spec
+#
+# IMPORTANT: Use "python -m PyInstaller" NOT bare "pyinstaller".
+# If multiple Python versions are installed, bare "pyinstaller" may
+# resolve to a different Python than "python", causing collect_all('cv2')
+# to find nothing and producing "No module named 'cv2'" at runtime.
 #
 # The -y flag overwrites the existing dist/MonsterWorld/ folder automatically.
 #
