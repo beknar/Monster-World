@@ -7,9 +7,9 @@ __pycache__/
 # Virtual environment
 venv/
 
-# PyInstaller intermediate build files only
-# dist/ is intentionally committed so the binary is downloadable
+# PyInstaller build output
 build/
+dist/
 *.spec.bak
 
 # Game assets — paid assets, not distributed with source

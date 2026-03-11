@@ -6,15 +6,7 @@ A 2D top-down action RPG built with Python and pygame. Fight your way through 10
 
 ## Download and Play
 
-A pre-built Windows executable is included in this repository (via Git LFS):
-
-```
-dist/MonsterWorld.exe
-```
-
-Download and double-click — no Python installation required. Windows will extract assets to a temp folder on first launch (takes a few seconds), then the game starts.
-
-> **Note:** `dist/MonsterWorld.exe` is stored with [Git LFS](https://git-lfs.com). Run `git lfs install` before cloning, or download the file directly from GitHub.
+**If you'd like to download the executable, it is available for free here: https://beknar777.itch.io/monster-world**
 
 ---
 
@@ -144,26 +136,23 @@ Full Xbox controller support with hot-plug detection. All on-screen hints adapt 
 
 > **You must provide your own `newassets/` directory.** See the Assets section above.
 
-**Requirements:** Python 3.10+, Git, Git LFS
+**Requirements:** Python 3.10+
 
 ```bash
-# 1. Install Git LFS (required for the exe in dist/)
-git lfs install
-
-# 2. Clone the repository
+# 1. Clone the repository
 git clone https://github.com/beknar/Monster-World.git
 cd Monster-World
 
-# 3. Create and activate a virtual environment
+# 2. Create and activate a virtual environment
 python -m venv venv
 source venv/Scripts/activate   # Windows Git Bash
 # venv\Scripts\activate        # PowerShell / CMD
 # source venv/bin/activate     # macOS / Linux
 
-# 4. Install dependencies
+# 3. Install dependencies
 pip install pygame opencv-python numpy
 
-# 5. Add your own newassets/ directory, then run
+# 4. Add your own newassets/ directory, then run
 python main.py
 ```
 
@@ -186,8 +175,6 @@ python main.py
 ---
 
 ## Building a Distributable
-
-A standalone executable can be built with **PyInstaller** — the end user needs no Python installation.
 
 > **You must have a valid `newassets/` directory before building.**
 
@@ -216,8 +203,6 @@ python -m PyInstaller -y MonsterWorld.spec
 Monster-World/
 ├── main.py              # Entry point
 ├── MonsterWorld.spec    # PyInstaller build spec
-├── dist/                # Pre-built executable (Git LFS)
-│   └── MonsterWorld.exe
 ├── src/                 # Game source code
 │   ├── game.py          # Main game loop and state machine
 │   ├── player.py        # Player class, movement, combat, levelling

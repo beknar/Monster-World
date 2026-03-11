@@ -4,6 +4,8 @@
 
 A 2D top-down action RPG built with Python and pygame. The player controls a hero character navigating through multiple stages, fighting monsters, gaining experience, leveling up, and defeating bosses.
 
+> **Assets not in repo:** The `newassets/` directory contains purchased third-party assets (Time Fantasy sprites, VHCMusic OST, custom splash video/audio) and is excluded from git via `.gitignore`. Anyone cloning this project must provide their own `newassets/` directory. The pre-built executable is distributed via itch.io: https://beknar777.itch.io/monster-world
+
 ## Tech Stack
 
 - **Language:** Python 3
@@ -1229,12 +1231,16 @@ All character and monster sprites are **sprite sheets** (multiple frames in a si
 
 The game packages into a **single self-contained `MonsterWorld.exe`** using PyInstaller onefile mode. All assets (sprites, sounds, music, video), Python runtime, DLLs, and game data are embedded inside the executable. The end user needs no Python installation and no extra folders — just the one `.exe` file.
 
+**The pre-built executable is distributed via itch.io:** https://beknar777.itch.io/monster-world
+
+The `dist/` directory and its contents are **not committed to the git repository** (excluded by `.gitignore`). Build locally and upload to itch.io when releasing a new version.
+
 ### Build command
 ```bash
 # From the project root with venv active
 pip install pyinstaller
 python -m PyInstaller -y MonsterWorld.spec
-# Output: dist/MonsterWorld.exe — distribute this single file only
+# Output: dist/MonsterWorld.exe — upload to itch.io to distribute
 ```
 
 > **Important:** Always use `python -m PyInstaller`, never bare `pyinstaller`. When multiple Python versions are installed (e.g., 3.11 and 3.12), the `pyinstaller` script in PATH may belong to a *different* Python than `python`. Running via `python -m PyInstaller` guarantees both use the same interpreter, so `collect_all('cv2')` actually finds the cv2 binaries. Using bare `pyinstaller` from the wrong Python produces `ModuleNotFoundError: No module named 'cv2'` at runtime even though cv2 is installed.
