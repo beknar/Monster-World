@@ -1227,23 +1227,26 @@ All character and monster sprites are **sprite sheets** (multiple frames in a si
 
 ## Distribution / PyInstaller Build
 
-The game can be packaged into a standalone distributable folder using PyInstaller. The end user needs no Python installation.
+The game packages into a **single self-contained `MonsterWorld.exe`** using PyInstaller onefile mode. All assets (sprites, sounds, music, video), Python runtime, DLLs, and game data are embedded inside the executable. The end user needs no Python installation and no extra folders — just the one `.exe` file.
 
 ### Build command
 ```bash
 # From the project root with venv active
 pip install pyinstaller
 python -m PyInstaller -y MonsterWorld.spec
-# Output: dist/MonsterWorld/  — distribute this entire folder
+# Output: dist/MonsterWorld.exe — distribute this single file only
 ```
 
 > **Important:** Always use `python -m PyInstaller`, never bare `pyinstaller`. When multiple Python versions are installed (e.g., 3.11 and 3.12), the `pyinstaller` script in PATH may belong to a *different* Python than `python`. Running via `python -m PyInstaller` guarantees both use the same interpreter, so `collect_all('cv2')` actually finds the cv2 binaries. Using bare `pyinstaller` from the wrong Python produces `ModuleNotFoundError: No module named 'cv2'` at runtime even though cv2 is installed.
 
+### Startup time note
+On each launch Windows extracts all embedded assets to a temp folder before the game starts. This adds a few seconds to startup time. The temp folder is cleaned up when the game exits. Save files are written to `%APPDATA%\MonsterWorld\saves\` (not the temp folder) so they persist across sessions.
+
 ### `MonsterWorld.spec`
 The spec file (project root) controls the build:
-- **`datas`**: recursively bundles `newassets/` (sprites, tilesets, sounds, music) and `data/` (JSON game data) into the bundle
+- **`datas`**: recursively embeds `newassets/` (sprites, tilesets, sounds, video, music) and `data/` (JSON game data) inside the exe
 - **`console=False`**: no terminal window (windowed game)
-- **`onedir` mode**: produces a folder rather than a single `.exe`; pygame games launch significantly faster this way since assets are not re-extracted on every run
+- **`onefile` mode**: all binaries, DLLs, and data are packed directly into a single `MonsterWorld.exe`. No `COLLECT` step — `a.binaries`, `a.zipfiles`, and `a.datas` are passed directly to `EXE()`.
 - **`cv2` (OpenCV) bundling — `collect_all('cv2')`**: OpenCV cannot be bundled via `hiddenimports` alone. The `.pyd` binary extension and all dependent DLLs must be explicitly collected using `collect_all('cv2')` from `PyInstaller.utils.hooks`. This returns `cv2_datas`, `cv2_binaries`, and `cv2_hiddenimports`, which are wired into the `Analysis()` call (`binaries=cv2_binaries`, `datas=added_files + cv2_datas`, `hiddenimports=[...] + cv2_hiddenimports`). Without this, the bundle produces `ModuleNotFoundError: No module named 'cv2'` at runtime even if `cv2` appears in `hiddenimports`.
 - **`hiddenimports`**: explicitly lists `pygame` sub-modules plus `numpy` and `numpy.core` (required for cv2 frame array operations); cv2 hidden imports are appended via `cv2_hiddenimports` from `collect_all('cv2')`
 - **`excludes`**: only `tkinter` is excluded (large and genuinely unused). **Do NOT add other stdlib modules here** — PyInstaller's own runtime hook (`pyi_rth_pkgres`) imports `pkg_resources` which pulls in `plistlib`, `email`, `xml`, and other stdlib modules at startup. Excluding any of them causes a `ModuleNotFoundError` crash before any game code runs.
