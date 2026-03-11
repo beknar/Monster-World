@@ -7,10 +7,14 @@ __pycache__/
 # Virtual environment
 venv/
 
-# PyInstaller build output — do not commit (1+ GB)
+# PyInstaller intermediate build files only
+# dist/ is intentionally committed so the binary is downloadable
 build/
-dist/
 *.spec.bak
+
+# Game assets — paid assets, not distributed with source
+# Anyone cloning this repo must provide their own newassets/ directory
+newassets/
 
 # Save files — user-specific, regenerated at runtime
 saves/

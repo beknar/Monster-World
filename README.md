@@ -4,6 +4,32 @@ A 2D top-down action RPG built with Python and pygame. Fight your way through 10
 
 ---
 
+## Download and Play
+
+A pre-built Windows executable is included in this repository (via Git LFS):
+
+```
+dist/MonsterWorld.exe
+```
+
+Download and double-click — no Python installation required. Windows will extract assets to a temp folder on first launch (takes a few seconds), then the game starts.
+
+> **Note:** `dist/MonsterWorld.exe` is stored with [Git LFS](https://git-lfs.com). Run `git lfs install` before cloning, or download the file directly from GitHub.
+
+---
+
+## ⚠️ Assets Not Included
+
+**The `newassets/` directory is not included in this repository.** It contains purchased third-party assets that cannot be redistributed:
+
+- **Visual assets** — sprites, tilesets, and objects from [Time Fantasy](https://timefantasy.net) by finalbossblues (commercial license)
+- **Music** — Fantasy RPG Complete OST by VHCMusic
+- **Splash screen video/audio** — custom files (`mw1.mp3`, `mw2.mp3`, `mw-openart1.mp4`, `mw-openart2.mp4`) in `newassets/custom/`
+
+**If you clone this repo and want to run from source, you must provide your own `newassets/` directory** with the same structure. See `CLAUDE.md` for the full asset directory reference.
+
+---
+
 ## Features
 
 ### Four Playable Heroes
@@ -114,41 +140,32 @@ Full Xbox controller support with hot-plug detection. All on-screen hints adapt 
 
 ---
 
-## Installation
+## Running from Source
 
-**Requirements:** Python 3.10+ and Git
+> **You must provide your own `newassets/` directory.** See the Assets section above.
+
+**Requirements:** Python 3.10+, Git, Git LFS
 
 ```bash
-# 1. Clone the repository
+# 1. Install Git LFS (required for the exe in dist/)
+git lfs install
+
+# 2. Clone the repository
 git clone https://github.com/beknar/Monster-World.git
 cd Monster-World
 
-# 2. Create and activate a virtual environment
+# 3. Create and activate a virtual environment
 python -m venv venv
+source venv/Scripts/activate   # Windows Git Bash
+# venv\Scripts\activate        # PowerShell / CMD
+# source venv/bin/activate     # macOS / Linux
 
-# Windows (Git Bash / PowerShell)
-source venv/Scripts/activate   # Git Bash
-# or
-venv\Scripts\activate          # PowerShell / CMD
+# 4. Install dependencies
+pip install pygame opencv-python numpy
 
-# macOS / Linux
-source venv/bin/activate
-
-# 3. Install dependencies
-pip install pygame
-```
-
----
-
-## Running the Game
-
-Make sure the virtual environment is activated, then:
-
-```bash
+# 5. Add your own newassets/ directory, then run
 python main.py
 ```
-
-The game window opens at 1920×1200 by default. You can change the resolution at any time from the **Options** screen in the main menu.
 
 ---
 
@@ -172,42 +189,24 @@ The game window opens at 1920×1200 by default. You can change the resolution at
 
 A standalone executable can be built with **PyInstaller** — the end user needs no Python installation.
 
-### 1. Install PyInstaller
+> **You must have a valid `newassets/` directory before building.**
+
 ```bash
 source venv/Scripts/activate   # Windows Git Bash
 pip install pyinstaller
+python -m PyInstaller -y MonsterWorld.spec
+# Output: dist/MonsterWorld.exe  (single file, ~200 MB)
 ```
 
-### 2. Build
-```bash
-pyinstaller MonsterWorld.spec
-```
-
-Output is written to `dist/MonsterWorld/`. Distribute that entire folder.
-
-### What the build includes
-| Included | Notes |
-|----------|-------|
-| `newassets/` | All sprites, tilesets, sounds, and music |
-| `data/` | Item, weapon, drop-table, and shop JSON files |
-| Python runtime | Embedded — no user install required |
-| pygame + SDL DLLs | Bundled automatically |
+> **Important:** Always use `python -m PyInstaller`, not bare `pyinstaller`. See `CLAUDE.md` for details.
 
 ### Save file location (distributed build)
-Save files are stored outside the bundle so they survive updates:
 
 | Platform | Location |
 |----------|----------|
 | Windows | `%APPDATA%\MonsterWorld\saves\` |
 | macOS | `~/Library/Application Support/MonsterWorld/saves/` |
 | Linux | `~/.local/share/MonsterWorld/saves/` |
-
-During development, saves continue to use the `saves/` folder at the project root.
-
-### Notes
-- Build must be run on the **target OS** — PyInstaller cannot cross-compile.
-- Bundle size is approximately **1.4 GB** (dominated by the full Fantasy RPG Complete OST).
-- To add a window icon, place an `.ico` file in the project root and uncomment the `icon=` line in `MonsterWorld.spec`.
 
 ---
 
@@ -216,6 +215,9 @@ During development, saves continue to use the `saves/` folder at the project roo
 ```
 Monster-World/
 ├── main.py              # Entry point
+├── MonsterWorld.spec    # PyInstaller build spec
+├── dist/                # Pre-built executable (Git LFS)
+│   └── MonsterWorld.exe
 ├── src/                 # Game source code
 │   ├── game.py          # Main game loop and state machine
 │   ├── player.py        # Player class, movement, combat, levelling
@@ -235,9 +237,10 @@ Monster-World/
 │   ├── weapons.json     # Weapon stats
 │   ├── drop_tables.json # Monster and chest loot tables
 │   └── shops.json       # Shop inventories per town
-├── saves/               # Save files (auto-created at runtime)
-└── newassets/           # All sprites, tilesets, sounds, and music
+└── saves/               # Save files (auto-created at runtime, not committed)
 ```
+
+> `newassets/` is not shown — it must be provided separately (see Assets section above).
 
 ---
 
@@ -253,10 +256,10 @@ All tilesets, character sprites, monster sprites, NPC sprites, objects, and othe
 | **Twitter** | [@finalbossblues](https://twitter.com/finalbossblues) |
 | **Facebook** | [finalbossblues](https://www.facebook.com/finalbossblues) |
 
-Assets are used under the terms of the Time Fantasy commercial license.
+Assets are used under the terms of the Time Fantasy commercial license. **Not included in this repository.**
 
 ### Music — Fantasy RPG Complete OST
-Background music tracks are from the **Fantasy RPG Complete OST** by VHCMusic, used under their respective license terms.
+Background music tracks are from the **Fantasy RPG Complete OST** by VHCMusic, used under their respective license terms. **Not included in this repository.**
 
 ### Code
 All game code is the author's own work.
