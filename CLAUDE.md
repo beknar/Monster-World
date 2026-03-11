@@ -1242,8 +1242,8 @@ The spec file (project root) controls the build:
 - **`datas`**: recursively bundles `newassets/` (sprites, tilesets, sounds, music) and `data/` (JSON game data) into the bundle
 - **`console=False`**: no terminal window (windowed game)
 - **`onedir` mode**: produces a folder rather than a single `.exe`; pygame games launch significantly faster this way since assets are not re-extracted on every run
-- **`hiddenimports`**: explicitly lists `pygame` sub-modules that PyInstaller may otherwise miss
-- **`excludes`**: strips unused stdlib modules (`tkinter`, `http`, etc.) to reduce bundle size
+- **`hiddenimports`**: explicitly lists `pygame` sub-modules, plus `cv2`, `numpy`, and `numpy.core` (required for splash-screen video decoding) that PyInstaller may otherwise miss
+- **`excludes`**: strips unused stdlib modules (`tkinter`, `http`, etc.) to reduce bundle size. **`xml` must NOT be excluded** — `pkg_resources` → `plistlib` requires it at runtime; excluding it causes a `ModuleNotFoundError` crash on launch
 
 ### PyInstaller-aware path resolution (`src/settings.py`)
 `BASE_DIR` is computed by `_base_path()`:
