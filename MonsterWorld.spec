@@ -55,11 +55,11 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         # Exclude heavy stdlib / third-party modules not used by the game
+        # NOTE: do NOT exclude 'xml' — pkg_resources → plistlib requires it
         'tkinter',
         'unittest',
         'email',
         'http',
-        'xml',
         'pydoc',
         'doctest',
         'difflib',
