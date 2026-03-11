@@ -303,9 +303,9 @@ The very first thing the player sees on launch is a **splash screen** (`STATE_SP
 - **Large golden PLAY button** — centred in the lower half, highlights brighter gold on mouse-hover
 - **Hint text** below the button — shows `"or press any key"` when keyboard only, or `"or press  A  on your controller"` when an Xbox controller is detected
 
-**Assets (randomly selected each launch from `newassets/custom/`):**
-- Videos: `mw-openart1.mp4` or `mw-openart2.mp4` (1920×1080, 24 fps, ~15 s each — looped until Play is pressed)
-- Music: `mw1.mp3` or `mw2.mp3` (loaded via `audio.play_music_file(path)` — loops indefinitely)
+**Assets (randomly selected each launch):**
+- Videos: `mw-openart1.mp4` or `mw-openart2.mp4` from `newassets/custom/` (1920×1080, 24 fps, ~15 s each — looped until Play is pressed)
+- Music: randomly chosen from `"main_theme"`, `"emotional"`, or `"menu"` via `audio.play_music()` — all from the Fantasy RPG Complete OST. Loops indefinitely until Play is pressed.
 
 **Advancing past the splash:**
 - Click the **PLAY** button (left mouse button)

@@ -348,10 +348,11 @@ class Game:
         track.  The first video frame is decoded immediately so the splash screen
         is not blank on the very first draw."""
         videos = ["mw-openart1.mp4", "mw-openart2.mp4"]
-        music_files = ["mw1.mp3", "mw2.mp3"]
+        # Use Fantasy RPG Complete OST tracks for the splash screen.
+        # main_theme, emotional, and menu are the most cinematic choices.
+        splash_tracks = ["main_theme", "emotional", "menu"]
 
         video_path = os.path.join(CUSTOM_ASSETS_PATH, random.choice(videos))
-        music_path = os.path.join(CUSTOM_ASSETS_PATH, random.choice(music_files))
 
         # Open video
         self._splash_cap = cv2.VideoCapture(video_path)
@@ -366,7 +367,7 @@ class Game:
                 frame_rgb.swapaxes(0, 1))
 
         # Play music (loops indefinitely until we leave the splash)
-        self.audio.play_music_file(music_path)
+        self.audio.play_music(random.choice(splash_tracks))
 
     def _enter_menu_from_splash(self):
         """Release video resources and transition to the main menu."""
