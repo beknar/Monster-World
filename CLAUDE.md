@@ -305,7 +305,7 @@ The very first thing the player sees on launch is a **splash screen** (`STATE_SP
 
 **Assets (randomly selected each launch):**
 - Videos: `mw-openart1.mp4` or `mw-openart2.mp4` from `newassets/custom/` (1920×1080, 24 fps, ~15 s each — looped until Play is pressed)
-- Music: randomly chosen from `"main_theme"`, `"emotional"`, or `"menu"` via `audio.play_music()` — all from the Fantasy RPG Complete OST. Loops indefinitely until Play is pressed.
+- Music: `mw1.mp3` or `mw2.mp3` from `newassets/custom/` (loaded via `audio.play_music_file(path)` — loops indefinitely until Play is pressed)
 
 **Advancing past the splash:**
 - Click the **PLAY** button (left mouse button)
